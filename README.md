@@ -8,7 +8,7 @@
 
 ## Data source
 
-WHO reported pertussi cases: https://immunizationdata.who.int/global/wiise-detail-page/pertussis-reported-cases-and-incidence?CODE=Global&GROUP=WHO_REGIONS+Countries&YEAR=
+WHO reported pertussis cases: https://immunizationdata.who.int/global/wiise-detail-page/pertussis-reported-cases-and-incidence?CODE=Global&GROUP=WHO_REGIONS+Countries&YEAR=
 
 WHO Diphtheria tetanus toxoid and pertussis (DTP) vaccination coverage: https://immunizationdata.who.int/global/wiise-detail-page/diphtheria-tetanus-toxoid-and-pertussis-(dtp)-vaccination-coverage?CODE=Global&GROUP=WHO_REGIONS+Countries&ANTIGEN=DTPCV1+DTPCV3&YEAR=
 
