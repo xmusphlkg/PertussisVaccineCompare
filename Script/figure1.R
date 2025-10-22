@@ -1,7 +1,13 @@
-# packages ----------------------------------------------------------------
+#####################################
+## @Description: Figure 1 for pertussis incidence trend analysis
+## @version: 1.0.0
+## @Author: Li Kangguo
+## @Date: 2025-10-22 09:01:50
+## @LastEditors: Li Kangguo
+## @LastEditTime: 2025-10-22 09:04:19
+#####################################
 
-library(nih.joinpoint)
-library(segmented)
+# packages ----------------------------------------------------------------
 
 library(tidyverse)
 library(openxlsx)
@@ -9,21 +15,100 @@ library(stringr)
 library(patchwork)
 library(paletteer)
 
+
+library(nih.joinpoint)
+
 rm(list = ls())
+
+decode_html_entities <- function(x) {
+     x <- str_replace_all(x, "&#39;", "'")
+     x <- str_replace_all(x, "&amp;", "&")
+     x
+}
 
 source('./script/joinpoint_setting.R')
 
-fill_color_source <- paletteer_d("werpals::pan")[1:2]
+fill_color_source <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6", "#E37222", "#69BE28", "#00B2A9", "#CD202C", "#747678")[1:2]
 fill_color_heatmap <- paletteer_d("awtools::a_palette")
 
 # data --------------------------------------------------------------------
 
 ## WHO --------------------------------------------------------------------
+
+# mapping from WHO-case names (after HTML decode) to UN population names
+case_to_pop_map <- c(
+     "United Kingdom of Great Britain and Northern Ireland" = "United Kingdom",
+     "Netherlands (Kingdom of the)" = "Netherlands",
+     "Micronesia (Federated States of)" = "Micronesia (Fed. States of)",
+     "Democratic Republic of the Congo" = "Dem. Rep. of the Congo",
+     "Democratic People's Republic of Korea" = "Dem. People's Rep. of Korea",
+     "Lao People's Democratic Republic" = "Lao People's Dem. Republic",
+     "Bonaire" = "Bonaire, Sint Eustatius and Saba",
+     "Saba" = "Bonaire, Sint Eustatius and Saba",
+     "Sint Eustatius" = "Bonaire, Sint Eustatius and Saba",
+     "occupied Palestinian territory, including east Jerusalem" = "State of Palestine",
+     "Wallis and Futuna" = "Wallis and Futuna Islands",
+     "Kosovo (in accordance with UN Security Council resolution 1244 (1999))" = "Kosovo (under UNSC res. 1244)",
+     "Côte d'Ivoire" = "Côte d'Ivoire" # kept for clarity after decode
+)
+
 region_names <- c(
      "African Region", "Eastern Mediterranean Region", "European Region",
      "Region of the Americas", "South-East Asia Region", "Western Pacific Region",
      "Global", 'WHO'
 )
+
+standardize_location <- function(x, map = case_to_pop_map) {
+     x2 <- decode_html_entities(x)
+     x2 <- str_trim(x2)
+     # apply explicit mapping when present
+     x2 <- ifelse(x2 %in% names(map), unname(map[x2]), x2)
+     x2
+}
+
+# read cases data from WHO data
+df_cases <- read.xlsx('./Data/Pertussis reported cases and incidence.xlsx')
+names(df_cases)[1] <- 'Location'
+
+# pivot data to long format
+df_cases <- df_cases |>
+     filter(!is.na(Disease)) |>
+     select(-Disease) |>
+     pivot_longer(cols = -Location, names_to = 'Year', values_to = 'Cases') |>
+     mutate(
+          Year = as.integer(Year),
+          Cases = as.numeric(str_replace_all(Cases, ',', '')),
+          Location = standardize_location(Location)
+     ) |>
+     filter(!Location %in% region_names)
+
+# read population data from UN data
+df_population <- read.csv('./Data/unpopulation_dataportal_20251021120614.csv')
+
+# pivot data to long format
+df_population <- df_population |>
+     select(
+          Location = Category,
+          Location_ID = Category_ID,
+          Year = Estimate_Method,
+          Population = Subregion
+     ) |>
+     mutate(Location = standardize_location(Location))
+
+# check data complete
+unique(df_cases$Location)[
+     !unique(df_cases$Location) %in% unique(df_population$Location)
+]
+
+unique(df_population$Location)[
+     !unique(df_population$Location) %in% unique(df_cases$Location)
+]
+
+df_incidence_who_country <- df_cases |>
+     left_join(df_population, by = c('Location', 'Year')) |>
+     mutate(Incidence = (Cases / Population) * 1e5)
+
+rm(df_cases, df_population, case_to_pop_map, standardize_location, decode_html_entities)
 
 # read regional data from WHO data
 df_incidence_who_region <- read.xlsx('./Data/Pertussis reported cases and incidence region.xlsx')
@@ -42,6 +127,14 @@ df_incidence_who_region <- df_incidence_who_region |>
      arrange(Location, Year)
 
 ## GBD ---------------------------------------------------------------------
+
+# read GBD incidence data
+df_incidence_gbd_country <- read.csv('./Data/IHME-GBD_2021_DATA-7facc03b-1.csv')
+
+df_incidence_gbd_country <- df_incidence_gbd_country |>
+     select(location_id, location_name, year, measure_name, age_name, metric_name, val, lower, upper) |>
+     # drop regional data
+     filter(!location_name %in% region_names)
 
 # read GBD regional data
 df_incidence_gbd_region <- read.csv('./Data/IHME-GBD_2021_DATA-629ff673-1.csv')
@@ -67,10 +160,10 @@ region_names <- c("Global",
 
 ## build joinpoint model for WHO data
 model_incidence_who_gloabl <- joinpoint(df_incidence_who_region |> filter(Location == 'Global', Year %in% 2000:2019),
-                                 Year,
-                                 Incidence,
-                                 run_opt = run_opt_who,
-                                 export_opt = export_opt_who)
+                                        Year,
+                                        Incidence,
+                                        run_opt = run_opt_who,
+                                        export_opt = export_opt_who)
 
 ## build joinpoint model for WHO data
 model_incidence_who_region <- joinpoint(df_incidence_who_region |> filter(Location != 'Global', Year %in% 2000:2019),
@@ -82,10 +175,10 @@ model_incidence_who_region <- joinpoint(df_incidence_who_region |> filter(Locati
 
 ## build joinpoint model for GBD data
 model_incidence_gbd_global <- joinpoint(df_incidence_gbd_region |> filter(Location == 'Global', Year %in% 2000:2019),
-                                 Year,
-                                 Incidence,
-                                 run_opt = run_opt_gbd,
-                                 export_opt = export_opt_gbd)
+                                        Year,
+                                        Incidence,
+                                        run_opt = run_opt_gbd,
+                                        export_opt = export_opt_gbd)
 
 ## build joinpoint model for GBD data
 model_incidence_gbd_region <- joinpoint(df_incidence_gbd_region |> filter(Location != 'Global', Year %in% 2000:2019),
@@ -144,7 +237,7 @@ panel_line_function <- function(i){
 # create panels
 fig1 <- lapply(1:length(region_names), panel_line_function)
 
-ggsave('./Output/Figure 1_1.pdf',
+ggsave('./Output/figure1_1.pdf',
        wrap_plots(fig1, ncol = 3, axis_titles = 'collect'),
        width = 12,
        height = 8,
@@ -185,7 +278,7 @@ panel_heatmap_function <- function(i){
 # create panels
 fig2 <- lapply(1:2, panel_heatmap_function)
 
-ggsave('./Output/Figure 1_2.pdf',
+ggsave('./Output/figure1_2.pdf',
        wrap_plots(fig2, ncol = 2, axes = 'collect_y', guides = 'collect')&
             theme(legend.position = 'right'),
        width = 8,
@@ -202,11 +295,3 @@ ggsave('./Output/Figure 1.png',
        width = 12,
        height = 8,
        dpi = 300)
-
-# save figure data --------------------------------------------------------
-
-write.xlsx(list('A-G' = df_incidence_region,
-                'H' = df_aapc_who,
-                'I' = df_aapc_gbd),
-           './Output/Figure 1.xlsx')
-

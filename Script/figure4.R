@@ -1,3 +1,11 @@
+#####################################
+## @Description: Figure 4 : Global pertussis incidence vs. vaccination program
+## @version: 1.0.0
+## @Author: Li Kangguo
+## @Date: 2025-10-21 19:20:50
+## @LastEditors: Li Kangguo
+## @LastEditTime: 2025-10-22 09:31:32
+#####################################
 
 # packages ----------------------------------------------------------------
 
@@ -182,8 +190,8 @@ DataAll <- DataInciRaw |>
 
 visual_vars <- c('VaccineDose', 'TimeFirstShotG', 'TimeLastShotG', 'VaccinePregnant')
 lab_vars <- c('Vaccine Doses', 
-              'Time to First Shot (months)', 
-              'Time to Last Shot (months)', 
+              'Time to First Shot', 
+              'Time to Last Shot', 
               'Maternal Vaccination')
 
 visual_vars_y <- c('WHO_Inci_2019', 'WHO_Inci_2021', 'WHO_Inci_2024', 'GBD_Inci_2019', 'GBD_Inci_2021')
@@ -197,69 +205,171 @@ scientific_10 <- function(x) {
      parse(text=gsub("e\\+*", " %*% 10^", scales::scientific_format()(x))) 
 }
 
-x <- 'VaccineDose'; y <- 'WHO_Inci_2019'; i <- 1; start_index <- 0
+y <- 'WHO_Inci_2019'; i <- 1; start_index <- 0
 
-fill_color <- paletteer_d("werpals::pan")
+fill_color <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6", "#E37222", "#69BE28", "#00B2A9", "#CD202C", "#747678")
 names(fill_color) <- labs_vars_y
 
-plot_panel <- function(y, i, start_index) {
-     
+# number of bootstrap resamples used for CIs and for tests (make configurable)
+bootstrap_n <- 1000
+# number of permutations for permutation test
+permutation_n <- 5000
+
+compute_panel <- function(y, i) {
      x <- visual_vars[i]
      type <- labs_vars_y[visual_vars_y == y]
-     
+
      DataAllTemp <- DataAll |> 
           select(location_id, !!x, !!y) |> 
           rename(var = !!x, y = !!y) |>
           drop_na() |> 
           mutate(type = type,
                  type =  factor(type, levels = labs_vars_y))
-     
+
      # Generate neighbor pairwise comparisons for unique levels of var
      unique_vars <- levels(DataAllTemp$var)
-     
+
      # Drop not enough level
      unique_vars <- unique_vars[unique_vars %in% unique(DataAllTemp$var)]
-     
-     my_comparisons <- Map(c, unique_vars[-length(unique_vars)], unique_vars[-1])
-     
-     # print stat compare
-     DataAllTemp |> 
-          group_by(var) |> 
-          summarise(inci = mean(y),
-                    .ungroup = T) |> 
-          mutate(inci = format(round(inci, 2))) |> 
-          print()
-     
-     ggplot(DataAllTemp,
-            aes(x = var, y = y, color = type))+
-          geom_boxplot(show.legend = T) +
-          geom_jitter(width = 0.2, alpha = 0.5, show.legend = T) +
+
+     # generate all pairwise comparisons between levels of var
+     if(length(unique_vars) > 1) {
+          my_comparisons <- combn(unique_vars, 2, simplify = FALSE)
+     } else {
+          my_comparisons <- list()
+     }
+
+     # Compute bootstrap mean and 95% CI per group (bootstrap by resampling with replacement)
+     bootstrap_summary <- DataAllTemp |>
+          group_by(var, type) |> 
+          summarise(n = n(), mean = mean(y, na.rm = TRUE), .groups = 'drop') |> 
+          rowwise() |> 
+          mutate(
+               ci = list({
+                    vals <- DataAllTemp$y[DataAllTemp$var == var & DataAllTemp$type == type]
+                    if(length(vals) <= 1) {
+                         c(lower = mean, upper = mean)
+                    } else {
+                         boots <- replicate(bootstrap_n, mean(sample(vals, replace = TRUE), na.rm = TRUE))
+                         quantile(boots, probs = c(0.025, 0.975), na.rm = TRUE)
+                    }
+               })
+          ) |> 
+          mutate(ci_lower = ci[[1]], ci_upper = ci[[2]]) |> 
+          select(-ci, -n) |> 
+          ungroup()
+
+     # Compute permutation-based pairwise tests using an inline permutation test implementation
+     if(length(my_comparisons) > 0) {
+          perm_test_pair <- function(vec, grp, n_perm = 5000, seed = NULL) {
+               if(!is.null(seed)) set.seed(seed)
+               levs <- levels(factor(grp))
+               if(length(levs) != 2) return(NA_real_)
+               obs <- mean(vec[grp == levs[2]], na.rm = TRUE) - mean(vec[grp == levs[1]], na.rm = TRUE)
+               combined <- vec
+               n <- length(vec)
+               perm_diffs <- numeric(n_perm)
+               for(b in seq_len(n_perm)) {
+                    perm_grp <- sample(grp, size = n, replace = FALSE)
+                    perm_diffs[b] <- mean(combined[perm_grp == levs[2]], na.rm = TRUE) - mean(combined[perm_grp == levs[1]], na.rm = TRUE)
+               }
+               mean(abs(perm_diffs) >= abs(obs), na.rm = TRUE)
+          }
+
+          p_list <- lapply(my_comparisons, function(pair) {
+               g1 <- pair[1]; g2 <- pair[2]
+               sub <- DataAllTemp |> filter(var %in% c(g1, g2))
+               if(nrow(sub) < 2) return(tibble(group1 = g1, group2 = g2, p = NA_real_))
+               pval <- tryCatch(perm_test_pair(sub$y, sub$var, n_perm = permutation_n), error = function(e) NA_real_)
+               tibble(group1 = g1, group2 = g2, p = pval)
+          })
+          p_df <- bind_rows(p_list)
+
+          # adjust and format
+          p_df <- p_df |> mutate(p.adj = p.adjust(p, method = 'holm')) |>
+               mutate(p.label = ifelse(is.na(p.adj), NA_character_, formatC(p.adj, format = 'f', digits = 2)),
+                      p.signif = case_when(is.na(p.adj) ~ '',
+                                           p.adj < 0.001 ~ '***',
+                                           p.adj < 0.01 ~ '**',
+                                           p.adj < 0.05 ~ '*',
+                                           TRUE ~ 'ns'))
+
+          # compute plotting positions using the global maximum of bootstrap CI upper bounds
+          max_ci_upper <- max(bootstrap_summary$ci_upper, na.rm = TRUE)
+          if(is.infinite(max_ci_upper) || is.na(max_ci_upper)) {
+               max_ci_upper <- max(DataAllTemp$y, na.rm = TRUE)
+          }
+          spacing <- 0.25 * abs(max_ci_upper)
+
+          p_df <- p_df |>
+               mutate(xmin = group1, xmax = group2) |>
+               arrange(group1, group2) |>
+               mutate(y.position = max_ci_upper + spacing * (row_number() - 1), p.value = p)
+     } else {
+          p_df <- NULL
+     }
+
+     list(
+          DataAllTemp = DataAllTemp,
+          bootstrap_summary = bootstrap_summary,
+          p_df = p_df,
+          unique_vars = unique_vars,
+          type = type
+     )
+}
+
+# Compute all panels ahead of plotting and store results in a list
+compute_all_panels <- function() {
+     panels <- vector('list', length(visual_vars_y))
+     names(panels) <- visual_vars_y
+     for(j in seq_along(visual_vars_y)) {
+          panels[[j]] <- vector('list', length(visual_vars))
+          for(i in seq_along(visual_vars)) {
+               panels[[j]][[i]] <- compute_panel(visual_vars_y[j], i)
+          }
+     }
+     panels
+}
+
+# Precompute all panels
+panels_list <- compute_all_panels()
+
+# Plot from a precomputed panel result
+plot_from_res <- function(res, i, start_index) {
+     DataAllTemp <- res$DataAllTemp
+     bootstrap_summary <- res$bootstrap_summary
+     p_df <- res$p_df
+     unique_vars <- res$unique_vars
+     type <- res$type
+
+     ggplot(DataAllTemp, aes(x = var, y = y, color = type)) +
+          geom_pointrange(data = bootstrap_summary,
+                          aes(x = var, y = mean, ymin = ci_lower, ymax = ci_upper, color = type),
+                          position = position_dodge(width = 0.6),
+                          size = 0.8,
+                          fatten = 1.5,
+                          show.legend = TRUE) +
+          {if(!is.null(p_df)) ggpubr::stat_pvalue_manual(p_df, label = "p.signif", hide.ns = FALSE) else NULL} +
           scale_color_manual(values = fill_color,
                              breaks = labs_vars_y,
                              drop = FALSE) +
-          # Add statistical comparison
-          ggpubr::stat_compare_means(comparisons = my_comparisons,
-                                     label = "p.signif",
-                                     method = "t.test",
-                                     p.adjust.method = "holm") +
-          scale_y_continuous(trans = 'sqrt',
-                             expand = expansion(mult = c(0, 0.25)))+
+          scale_y_continuous(limits = c(0, NA),
+                             expand = expansion(mult = c(0, 0.25))) +
           scale_x_discrete(limits = unique_vars) +
-          theme_bw()+
+          theme_bw() +
           theme(panel.grid = element_blank()) +
           labs(title = LETTERS[start_index + i],
                x = lab_vars[i],
                color = NULL,
                y = "Incidence rate (per 100,000 population)")
-     
 }
 
-# Save figures
-fig_1 <- lapply(1:length(visual_vars), plot_panel, y = visual_vars_y[1], start_index = 0)
-fig_2 <- lapply(1:length(visual_vars), plot_panel, y = visual_vars_y[2], start_index = 4)
-fig_3 <- lapply(1:length(visual_vars), plot_panel, y = visual_vars_y[3], start_index = 8)
-fig_4 <- lapply(1:length(visual_vars), plot_panel, y = visual_vars_y[4], start_index = 12)
-fig_5 <- lapply(1:length(visual_vars), plot_panel, y = visual_vars_y[5], start_index = 16)
+# Save figures (plot from precomputed results)
+fig_1 <- lapply(seq_along(visual_vars), function(i) plot_from_res(panels_list[[1]][[i]], i, 0))
+fig_2 <- lapply(seq_along(visual_vars), function(i) plot_from_res(panels_list[[2]][[i]], i, 4))
+fig_3 <- lapply(seq_along(visual_vars), function(i) plot_from_res(panels_list[[3]][[i]], i, 8))
+fig_4 <- lapply(seq_along(visual_vars), function(i) plot_from_res(panels_list[[4]][[i]], i, 12))
+fig_5 <- lapply(seq_along(visual_vars), function(i) plot_from_res(panels_list[[5]][[i]], i, 16))
 
 figs <- c(fig_1, fig_2, fig_3, fig_4, fig_5)
 
@@ -269,16 +379,64 @@ fig <- wrap_plots(figs, ncol = 4, guides = 'collect', axis_titles = 'collect') &
 # save
 ggsave('./Output/Figure 4.png',
        plot = fig,
-       width = 12, height = 9, dpi = 300)
+       width = 12, height = 12, dpi = 300)
 
 ggsave('./Output/Figure 4.pdf',
        plot = fig,
        # plot = p1 / p2,
-       width = 12, height = 9, 
+       width = 12, height = 12, 
        device = cairo_pdf,
        family = "Helvetica")
 
 # save figure data --------------------------------------------------------
 
-write.xlsx(DataAll,
-           './Output/Figure 4.xlsx')
+# Save computed stats to Excel: one sheet per panel/variable (avoid overlapping writes)
+wb <- createWorkbook()
+for(j in seq_along(panels_list)) {
+     for(i in seq_along(panels_list[[j]])) {
+          res <- panels_list[[j]][[i]]
+          # create a safe sheet name: panel letter + short descriptor
+          panel_letter <- LETTERS[j]
+          type_clean <- gsub('[^A-Za-z0-9]', '_', as.character(res$type))
+          var_clean <- gsub('[^A-Za-z0-9]', '_', visual_vars[i])
+          sheet_name <- paste0(panel_letter, '_', substr(type_clean, 1, 20), '_', substr(var_clean, 1, 10))
+          # Excel sheet names must be <= 31 chars
+          sheet_name <- substr(sheet_name, 1, 31)
+          # ensure sheet name is unique in workbook
+          existing <- names(wb)
+          suffix <- 1
+          base_name <- sheet_name
+          while(sheet_name %in% existing) {
+               suffix <- suffix + 1
+               # keep within 31 chars
+               sheet_name <- substr(paste0(base_name, '_', suffix), 1, 31)
+          }
+          addWorksheet(wb, sheet_name)
+
+          # write bootstrap_summary if present
+          if(!is.null(res$bootstrap_summary) && nrow(res$bootstrap_summary) > 0) {
+               writeData(wb, sheet = sheet_name, x = res$bootstrap_summary,
+                          startCol = 1, startRow = 1, colNames = TRUE, rowNames = FALSE)
+               current_row <- nrow(res$bootstrap_summary) + 3
+          } else {
+               current_row <- 1
+          }
+
+          # write p_df if present
+          if(!is.null(res$p_df) && nrow(res$p_df) > 0) {
+               writeData(wb, sheet = sheet_name, x = res$p_df,
+                          startCol = 1, startRow = current_row, colNames = TRUE, rowNames = FALSE)
+               current_row <- current_row + nrow(res$p_df) + 3
+          }
+
+          # write DataAllTemp if present
+          if(!is.null(res$DataAllTemp) && nrow(res$DataAllTemp) > 0) {
+               writeData(wb, sheet = sheet_name, x = res$DataAllTemp,
+                          startCol = 1, startRow = current_row, colNames = TRUE, rowNames = FALSE)
+          }
+     }
+}
+
+saveWorkbook(wb,
+             './Output/Figure 4.xlsx',
+             overwrite = TRUE)

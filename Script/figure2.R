@@ -1,3 +1,11 @@
+#####################################
+## @Description: Figure 2: Global routine pertussis vaccination program
+## @version: 1.0.0
+## @Author: Li Kangguo
+## @Date: 2025-10-21 18:40:46
+## @LastEditors: Li Kangguo
+## @LastEditTime: 2025-10-22 09:18:37
+#####################################
 
 # packages ----------------------------------------------------------------
 
@@ -70,7 +78,7 @@ Data <- DataVaccine |>
 
 breaks <- pretty(c(Data$Count, 0), n = 5)
 
-fill_color <- paletteer_d("werpals::pan")
+fill_color <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6", "#E37222", "#69BE28", "#00B2A9", "#CD202C", "#747678")
 names(fill_color) <- levels(DataVaccine$VaccineDose)
 
 p1 <- ggplot(Data) +
@@ -79,7 +87,7 @@ p1 <- ggplot(Data) +
      geom_text(aes(x = VaccineDose, y = Count, label = Count), 
                vjust = -0.3,
                size = 4) +
-     scale_fill_paletteer_d("wesanderson::AsteroidCity1") +
+     scale_fill_manual(values = fill_color) +
      scale_y_continuous(breaks = breaks,
                         limits = range(breaks),
                         expand = expansion(mult = c(0, 0))) +

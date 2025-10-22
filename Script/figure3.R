@@ -1,3 +1,11 @@
+#####################################
+## @Description: Figure 3: Global maternal pertussis vaccination program
+## @version: 1.0.0
+## @Author: Li Kangguo
+## @Date: 2025-10-21 18:48:11
+## @LastEditors: Li Kangguo
+## @LastEditTime: 2025-10-22 09:18:54
+#####################################
 
 # packages ----------------------------------------------------------------
 
@@ -46,7 +54,7 @@ DataMapPlot <- DataMap |>
 
 # visualization: booster vaccination program ------------------------------------
 
-fill_color <- paletteer_d("werpals::pan")
+fill_color <- c("#2A6EBB", "#F0AB00")
 
 p1 <- ggplot(DataMapPlot) +
      geom_sf(data = DataMapBorder, color = 'grey', fill = NA) +
@@ -90,7 +98,7 @@ DataPeriods <- data.frame(
                              labels = c('1st Trimester', '2nd Trimester', '3rd Trimester')))
 
 # Visualization
-fill_color <- paletteer_d("werpals::pan")
+fill_color <- c("#C50084", "#7D5CC6", "#E37222")
 
 # split data into two parts for better visualization
 n <- nrow(DataTime)
@@ -103,7 +111,7 @@ p2_1 <- ggplot(DataTime_A) +
               aes(xmin = Start, xmax = End, ymin = -Inf, ymax = Inf, fill = Periods),
               alpha = 0.5) +
     geom_linerange(aes(y = CODE, xmin = VaccinePregnantTime1, xmax = VaccinePregnantTime2),
-                   linewidth = 2, color = "#5785C1FF") +
+                   linewidth = 2, color = "#2A6EBB") +
     coord_cartesian(xlim = c(8, 36)) +
     scale_y_discrete(limits = rev(DataTime_A$CODE),
                      labels = rev(DataTime_A$location_name_1)) +
