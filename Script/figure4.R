@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-21 19:20:50
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2025-10-22 09:31:32
+## @LastEditTime: 2025-10-22 11:23:43
 #####################################
 
 # packages ----------------------------------------------------------------
@@ -147,6 +147,16 @@ DataIncidenceWHO <- df_cases |>
      select(Location_ID, Location, Year, Incidence) |>
      pivot_wider(names_from = Year, values_from = Incidence, names_prefix = 'WHO_Inci_')
 
+# also keep raw Cases and Population for the target years in wide format so downstream
+# scripts can fit count models with offsets without re-loading raw files
+DataCasesPopWide <- df_cases |>
+     group_by(Location, Year) |>
+     summarise(Cases = sum(Cases), .groups = 'drop') |>
+     left_join(df_population, by = c('Location', 'Year')) |>
+     filter(Year %in% c(2019, 2021, 2024)) |>
+     select(Location_ID, Location, Year, Cases, Population) |>
+     pivot_wider(names_from = Year, values_from = c(Cases, Population), names_sep = "_")
+
 rm(df_cases, df_population, case_to_pop_map, standardize_location, decode_html_entities)
 
 ## GBD cases ---------------------------------------------------------------
@@ -170,7 +180,9 @@ rm(df_incidence_gbd_country)
 
 DataInciRaw <- DataIncidenceWHO |> 
      full_join(DataCountry, by = c('Location_ID' = 'ISO3')) |> 
-     full_join(DataIncidenceGBD, by = 'location_id')
+     full_join(DataIncidenceGBD, by = 'location_id') |> 
+     # join the raw counts/population (wide) so DataAll contains Cases_2019, Population_2019, etc.
+     left_join(DataCasesPopWide, by = c('Location', 'Location_ID'))
 
 # add GBD data
 DataAll <- DataInciRaw |> 
@@ -440,3 +452,6 @@ for(j in seq_along(panels_list)) {
 saveWorkbook(wb,
              './Output/Figure 4.xlsx',
              overwrite = TRUE)
+
+# save DataAll for figure5
+save(DataAll, file = './Output/DataAll.RData')

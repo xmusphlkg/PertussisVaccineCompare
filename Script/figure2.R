@@ -78,7 +78,7 @@ Data <- DataVaccine |>
 
 breaks <- pretty(c(Data$Count, 0), n = 5)
 
-fill_color <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6", "#E37222", "#69BE28", "#00B2A9", "#CD202C", "#747678")
+fill_color <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6")
 names(fill_color) <- levels(DataVaccine$VaccineDose)
 
 p1 <- ggplot(Data) +
@@ -115,8 +115,8 @@ Data <- DataVaccine |>
      summarise(Count = n()) |> 
      ungroup()
 
+fill_color <- c("#7D5CC6", "#E37222", "#69BE28")
 names(fill_color) <- levels(DataVaccine$TimeFirstShotG)
-
 breaks <- pretty(c(Data$Count, 0), n = 5)
 
 p3 <- ggplot(Data) +
@@ -153,8 +153,8 @@ Data <- DataVaccine |>
      summarise(Count = n()) |> 
      ungroup()
 
+fill_color <- c("#E37222", "#69BE28", "#00B2A9", "#CD202C", "#747678")
 names(fill_color) <- levels(DataVaccine$TimeLastShotG)
-
 breaks <- pretty(c(Data$Count, 0), n = 5)
 
 p5 <- ggplot(Data) +
