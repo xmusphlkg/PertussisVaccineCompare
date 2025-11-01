@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-22 09:01:50
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2025-10-22 09:04:19
+## @LastEditTime: 2025-11-01 11:29:24
 #####################################
 
 # packages ----------------------------------------------------------------
@@ -159,8 +159,7 @@ region_names <- c("Global",
 ## WHO ---------------------------------------------------------------------
 
 ## build joinpoint model for WHO data
-model_incidence_who_gloabl <- joinpoint(df_incidence_who_region |>
-                                             filter(Location == 'Global', Year %in% 2000:2019),
+model_incidence_who_global <- joinpoint(df_incidence_who_region |> filter(Location == 'Global', Year %in% 2000:2019),
                                         Year,
                                         Incidence,
                                         run_opt = run_opt_who,
@@ -190,7 +189,7 @@ model_incidence_gbd_region <- joinpoint(df_incidence_gbd_region |> filter(Locati
                                         export_opt = export_opt_gbd)
 
 # clean data
-df_aapc_who <- rbind(get_aapc(model_incidence_who_gloabl) |> mutate(location = 'Global'),
+df_aapc_who <- rbind(get_aapc(model_incidence_who_global) |> mutate(location = 'Global'),
                      get_aapc(model_incidence_who_region)) |>
      mutate(`AAPC (95%CI)` = paste0(aapc, p_value_label),
             aapc = as.numeric(aapc),
@@ -202,13 +201,15 @@ df_aapc_gbd <- rbind(get_aapc(model_incidence_gbd_global) |> mutate(location = '
             aapc = as.numeric(aapc),
             location = factor(location, levels = region_names))
 
-save.image('./Data/jp_model.RData')
+save.image('./Output/jp_model.RData')
+
+load('./Output/jp_model.RData')
 
 # figure ------------------------------------------------------------------
 
 ## panel line --------------------------------------------------------------
 
-i <- 1
+i <- 2
 
 panel_line_function <- function(i){
      data_region <- df_incidence_region |> 
@@ -216,12 +217,28 @@ panel_line_function <- function(i){
      
      breaks <- pretty(c(0, data_region$Incidence, data_region$upper))
      
+     if (region_names[i] == 'Global'){
+          data_region_jp <- rbind(
+               model_incidence_who_global$data_export |> mutate(Source = 'WHO'),
+               model_incidence_gbd_global$data_export |> mutate(Source = 'GBD')
+          )
+     } else {
+          data_region_jp <- rbind(
+               model_incidence_who_region$data_export |> mutate(Source = 'WHO'),
+               model_incidence_gbd_region$data_export |> mutate(Source = 'GBD')
+          ) |>
+               filter(location == region_names[i]) |>
+               select(-location)
+     }
+     
      ggplot(data_region, aes(x = Year, y = Incidence, color = Source)) +
-          geom_line() +
-          geom_point()+
-          geom_ribbon(aes(ymin = lower, ymax = upper, fill = Source), alpha = 0.2, color = NA) +
+          geom_point() +
+          geom_linerange(aes(ymin = lower, ymax = upper)) +
+          geom_line(data = data_region_jp,
+                    aes(x = year, y = model, color = Source)) +
           scale_y_continuous(breaks = breaks, limits = range(breaks), expand = c(0,0)) +
-          scale_x_continuous(breaks = seq(2000, 2025, by = 5), limits = c(2000, 2025), expand = c(0,0)) +
+          scale_x_continuous(breaks = seq(2000, 2025, by = 5), limits = c(2000, 2025),
+                             expand = expansion(add = c(1, 0))) +
           scale_color_manual(values = fill_color_source) +
           scale_fill_manual(values = fill_color_source) +
           labs(title = paste(LETTERS[i], region_names[i], sep = ': '),
