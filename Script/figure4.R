@@ -43,9 +43,6 @@ DataVaccine <- DataVaccine |>
                       TimeFirstShot = 3,
                       TimeLastShot = 6*12))
 
-# Fix Romania CODE: ROU -> ROM
-DataVaccine$CODE[DataVaccine$CODE == 'ROU'] <- 'ROM'
-
 DataVaccine <- DataVaccine |> 
      mutate(TimeFirstShotG = cut(as.numeric(TimeFirstShot), 
                                  breaks = c(-Inf, 1.5, 2.5, Inf),
@@ -358,8 +355,6 @@ plot_from_res <- function(res, i, start_index) {
           geom_pointrange(data = bootstrap_summary,
                           aes(x = var, y = mean, ymin = ci_lower, ymax = ci_upper, color = type),
                           position = position_dodge(width = 0.6),
-                          size = 0.8,
-                          fatten = 1.5,
                           show.legend = TRUE) +
           {if(!is.null(p_df)) ggpubr::stat_pvalue_manual(p_df, label = "p.signif", hide.ns = FALSE) else NULL} +
           scale_color_manual(values = fill_color,

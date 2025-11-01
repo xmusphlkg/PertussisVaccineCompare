@@ -159,7 +159,8 @@ region_names <- c("Global",
 ## WHO ---------------------------------------------------------------------
 
 ## build joinpoint model for WHO data
-model_incidence_who_gloabl <- joinpoint(df_incidence_who_region |> filter(Location == 'Global', Year %in% 2000:2019),
+model_incidence_who_gloabl <- joinpoint(df_incidence_who_region |>
+                                             filter(Location == 'Global', Year %in% 2000:2019),
                                         Year,
                                         Incidence,
                                         run_opt = run_opt_who,
@@ -200,6 +201,8 @@ df_aapc_gbd <- rbind(get_aapc(model_incidence_gbd_global) |> mutate(location = '
      mutate(`AAPC (95%CI)` = paste0(aapc, p_value_label),
             aapc = as.numeric(aapc),
             location = factor(location, levels = region_names))
+
+save.image('./Data/jp_model.RData')
 
 # figure ------------------------------------------------------------------
 
