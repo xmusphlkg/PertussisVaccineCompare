@@ -257,7 +257,7 @@ panel_line_function <- function(i){
 # create panels
 fig1 <- lapply(1:length(region_names), panel_line_function)
 
-ggsave('./Output/figure1_1.pdf',
+ggsave('./Output/Figure1_1.pdf',
        wrap_plots(fig1, ncol = 3, axis_titles = 'collect'),
        width = 12,
        height = 8,
@@ -298,7 +298,7 @@ panel_heatmap_function <- function(i){
 # create panels
 fig2 <- lapply(1:2, panel_heatmap_function)
 
-ggsave('./Output/figure1_2.pdf',
+ggsave('./Output/Figure1_2.pdf',
        wrap_plots(fig2, ncol = 2, axes = 'collect_y', guides = 'collect')&
             theme(legend.position = 'right'),
        width = 8,

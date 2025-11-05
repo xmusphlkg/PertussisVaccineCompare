@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-22 11:08:31
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2025-11-03 10:52:17
+## @LastEditTime: 2025-11-05 16:13:19
 #####################################
 
 library(tidyverse)
@@ -15,6 +15,7 @@ library(openxlsx)
 library(flextable)
 library(gt)
 library(brms)
+library(patchwork)
 
 rm(list = ls())
 
@@ -114,9 +115,7 @@ DataLongRates <- DataLongCounts |>
      mutate(
           Region = ifelse(is.na(Region), 'Unknown', Region),
           Region = factor(Region),
-          uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat),
-          uhc_cat = factor(uhc_cat, levels = c('Very low', 'Low', 'Medium', 'High', 'Very high', 'Unknown')),
-          location_id = factor(location_id)
+          uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat)
      )
 
 # Fit ---------------------------------------------------------------------
@@ -132,7 +131,7 @@ fit_bayes_hier_gaussian <- function(df, year, source = NULL, min_obs = 10) {
 
      # covariates: VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant
      # nested random intercepts: (1 | Region/location_id)
-     fmla <- as.formula('log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG + VaccinePregnant + uhc_cat + (1|Region/location_id)')
+     fmla <- as.formula('log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG + VaccinePregnant + (1|uhc_cat/location_id)')
 
      # weakly informative priors as specified
      priors <- c(
@@ -182,7 +181,8 @@ fit_bayes_hier_gaussian <- function(df, year, source = NULL, min_obs = 10) {
 # Fit Bayesian hierarchical models for each available source-year combo
 combos_bayes <- DataLongRates |>
      group_by(source, Year) |>
-     summarise(n = n(), .groups = 'drop')
+     summarise(n = n(), .groups = 'drop') |> 
+     arrange(desc(source), Year)
 
 bayes_models <- list()
 bayes_results <- list()
@@ -217,20 +217,61 @@ saveRDS(list(models = bayes_models, summary = results_bayes_all),
 plot_df <- results_bayes_all |> filter(!term %in% c('Intercept')) |> 
      mutate(term = factor(term, levels = unique(term)))
 
-p_forest <- ggplot(plot_df, aes(x = term, y = rr_median, ymin = rr_lower, ymax = rr_upper, color = source)) +
-     geom_pointrange(position = position_dodge(width = 0.6), size = 0.6) +
-     geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
-     coord_flip() +
-     facet_wrap(~ year, scales = 'fixed') +
-     scale_y_log10() +
-     scale_x_discrete(limits = rev(levels(plot_df$term))) +
-     labs(x = NULL, y = 'Rate ratio (exp(coef))', title = 'Posterior rate ratios (median and 95% CI)') +
-     theme_minimal() +
-     theme(legend.position = 'bottom')
+labs_vars_y <- c('Incidence rate, 2019 (WHO)', 
+                 'Incidence rate, 2021 (WHO)', 
+                 'Incidence rate, 2024 (WHO)', 
+                 'Incidence rate, 2019 (GBD)', 
+                 'Incidence rate, 2021 (GBD)')
+
+fill_color <- c("#2A6EBB", "#F0AB00", "#C50084", "#7D5CC6", "#E37222")
+names(fill_color) <- labs_vars_y
+
+plot_function <- function(i){
+     outcome <- plot_df |> 
+          filter(year == combos_bayes$Year[i] & source == combos_bayes$source[i]) |> 
+          ggplot(aes(x = term, y = rr_median, ymin = rr_lower, ymax = rr_upper,
+                     color = factor(labs_vars_y[i], levels = labs_vars_y))) +
+          geom_pointrange(position = position_dodge(width = 0.6), size = 0.6, show.legend = T) +
+          geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
+          coord_flip() +
+          scale_y_log10(limits = range(c(plot_df$rr_lower, plot_df$rr_upper))) +
+          scale_x_discrete(limits = rev(levels(plot_df$term)),
+                           labels = rev(c('4 doses', '5  doses', '6 doses', '[1.5,2.5)m', '[2.5,3.0]m',
+                                      '[1,2]y', '[3,5]y', '[6,12]y', '[13,18]y', 'Maternal vacination'))) +
+          scale_color_manual(values = fill_color,
+                             drop = F) +
+          labs(x = NULL, y = 'Rate ratio', title = LETTERS[i], color = NULL)+
+          theme_bw() +
+          guides(color = guide_legend(ncol = 1))
+     
+     if (!i %in% c(1, 4)) {
+          outcome <- outcome +
+               theme(axis.text.y = element_blank())
+     } else {
+          outcome <- outcome +
+               theme(plot.margin = unit(c(5.5, 5.5, 5.5, 50), "pt"))
+          
+     }
+     
+     outcome
+}
+
+fig <- lapply(seq_len(nrow(combos_bayes)), plot_function)
+
+fig[[nrow(combos_bayes)+1]] <- guide_area()
+
+# increase right margin
+fig <- wrap_plots(fig, ncol = 3, guides = 'collect', axis = 'collect')
 
 ggsave('./Output/Figure 5.png',
-       p_forest,
-       width = 10, height = 6, dpi = 300)
+       fig,
+       width = 12, height = 6, dpi = 300)
+
+ggsave('./Output/Figure 5.pdf',
+       plot = fig,
+       width = 12, height = 6, 
+       device = cairo_pdf,
+       family = "Helvetica")
 
 # write numeric summary
 write.csv(results_bayes_all,
