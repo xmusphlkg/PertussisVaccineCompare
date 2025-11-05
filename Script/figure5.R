@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-22 11:08:31
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2025-11-01 10:32:55
+## @LastEditTime: 2025-11-03 10:52:17
 #####################################
 
 library(tidyverse)
@@ -28,142 +28,103 @@ region_names <- c("Global", 'WHO region',
 
 load('./Output/DataAll.RData')
 
-## WHO data ----------------------------------------------------------------
-
-decode_html_entities <- function(x) {
-     x <- str_replace_all(x, "&#39;", "'")
-     x <- str_replace_all(x, "&amp;", "&")
-     x
-}
-
-# mapping from WHO-case names (after HTML decode) to UN population names
-case_to_pop_map <- c(
-     "United Kingdom of Great Britain and Northern Ireland" = "United Kingdom",
-     "Netherlands (Kingdom of the)" = "Netherlands",
-     "Micronesia (Federated States of)" = "Micronesia (Fed. States of)",
-     "Democratic Republic of the Congo" = "Dem. Rep. of the Congo",
-     "Democratic People's Republic of Korea" = "Dem. People's Rep. of Korea",
-     "Lao People's Democratic Republic" = "Lao People's Dem. Republic",
-     "Bonaire" = "Bonaire, Sint Eustatius and Saba",
-     "Saba" = "Bonaire, Sint Eustatius and Saba",
-     "Sint Eustatius" = "Bonaire, Sint Eustatius and Saba",
-     "occupied Palestinian territory, including east Jerusalem" = "State of Palestine",
-     "Wallis and Futuna" = "Wallis and Futuna Islands",
-     "Kosovo (in accordance with UN Security Council resolution 1244 (1999))" = "Kosovo (under UNSC res. 1244)",
-     "Côte d'Ivoire" = "Côte d'Ivoire" # kept for clarity after decode
-)
-
-standardize_location <- function(x, map = case_to_pop_map) {
-     x2 <- decode_html_entities(x)
-     x2 <- str_trim(x2)
-     # apply explicit mapping when present
-     x2 <- ifelse(x2 %in% names(map), unname(map[x2]), x2)
-     x2
-}
-
-# read cases data from WHO data
-DataWHOCases <- read.xlsx('./Data/Pertussis reported cases and incidence.xlsx')
-names(DataWHOCases)[1] <- 'Location'
-
-# pivot data to long format
-DataWHOCases <- DataWHOCases |>
-     filter(!is.na(Disease)) |>
-     select(-Disease) |>
-     pivot_longer(cols = -Location, names_to = 'Year', values_to = 'Cases') |>
-     mutate(Year = as.integer(Year),
-            Cases = as.numeric(str_replace_all(Cases, ',', '')),
-            Location = standardize_location(Location)) |>
-     group_by(Location, Year) |>
-     summarise(Cases = sum(Cases), .groups = 'drop') |>
-     filter(!Location %in% region_names, Year %in% c(2019, 2021, 2024)) |> 
-     pivot_wider(names_from = Year, values_from = Cases, names_prefix = 'WHO_Cases_')
-
-## GBD data ---------------------------------------------------------------
-
-# read GBD incidence data
-DataGBDCases <- read.csv('./Data/IHME-GBD_2021_DATA-7facc03b-1.csv')
-
-DataGBDCases <- DataGBDCases|>
-     # drop regional data
-     filter(!location_name %in% region_names, measure_name != "Deaths",
-            age_name == 'All ages', metric_name == 'Number',
-            year %in% c(2019, 2021, 2024)) |>
-     select(location_id, location_name, year, val)
-
-DataGBDCases <- DataGBDCases |>
-     pivot_wider(names_from = year, values_from = val, names_prefix = 'GBD_Cases_')
-
-rm(region_names, case_to_pop_map, decode_html_entities, standardize_location)
-
 ## bind --------------------------------------------------------------------
 
 DataAll <- DataAll |>
-     select(location_id, location_name, Location, Location_ID, ISO2, Population_2019, Population_2021,
-            Population_2024, VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
-     left_join(DataWHOCases, by = c('location_name' = 'Location')) |>
-     left_join(DataGBDCases, by = c('location_id', 'location_name'))
+     select(location_id, location_name, Location, Location_ID, ISO2, 
+            VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant,
+            contains('WHO_Inci_'), contains('GBD_Inci_'), contains('Population_'))
 
 # attach Region mapping: https://cdn.who.int/media/docs/default-source/air-pollution-documents/air-quality-and-health/un-agencies-region-classification-for-country.xlsx?sfvrsn=289af35f_3
-unpop <- read.xlsx("./Data/un-agencies-region-classification-for-country.xlsx")
+unpop <- read.xlsx("./Data/CLASS_2025_07_02.xlsx")
 unpop_map <- unpop |>
-     select(ISO.Country.code, WHO.Region.name2) |>
-     rename(ISO3 = ISO.Country.code, Region = WHO.Region.name2)
+     select(Code, Income.group) |>
+     rename(ISO3 = Code, Region = Income.group)
 
 DataAll <- DataAll |>
      left_join(unpop_map, by = c(Location_ID = 'ISO3'))
 
-# model -------------------------------------------------------------------
+rm(unpop, unpop_map)
 
-## Build long dataset stacking WHO and GBD cases with a `source` column
-# pivot WHO and GBD case columns separately, then bind_rows into a long table
+# attach UHC service coverage index data: https://data.who.int/indicators/i/3805B1E/9A706FD
+uhc_data <- read.csv("./Data/UHC service coverage index.csv") |>
+     select(Year = DIM_TIME, GEO_NAME_SHORT, uhc_index = INDEX_N)
+
+# using 2021 data to replace 2024 value
+uhc_2024 <- uhc_data |>
+     filter(Year == 2021) |>
+     mutate(Year = 2024)
+
+uhc_data <- bind_rows(uhc_data, uhc_2024) |> 
+     # cut index to very high (80+), high (60-79), medium (40-59), low (20-39), very low (<20)
+     # https://www.who.int/news-room/questions-and-answers/item/tracking-universal-health-coverage
+     mutate(uhc_cat = cut(uhc_index,
+                          breaks = c(-Inf, 20, 40, 60, 80, Inf),
+                          labels = c('Very low', 'Low', 'Medium', 'High', 'Very high')))
+
+rm(uhc_2024)
+
+## data clean -------------------------------------------------------------------
+
+## Build long dataset stacking WHO and GBD Inci data with a `source` column
+# pivot WHO and GBD incidence columns separately, then bind_rows into a long table
 who_long <- DataAll |>
-     select(location_id, starts_with('WHO_Cases_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant, starts_with('Population_')) |>
-     pivot_longer(cols = matches('WHO_Cases_\\d{4}'), names_to = 'CasesVar', values_to = 'Cases') |>
-     mutate(Year = as.integer(str_extract(CasesVar, '\\d{4}')), source = 'WHO') |>
-     select(-CasesVar)
+     select(location_id, Location_ID, location_name, starts_with('WHO_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
+     pivot_longer(cols = matches('WHO_Inci_\\d{4}'), names_to = 'InciVar', values_to = 'Incidence') |>
+     mutate(Year = as.integer(str_extract(InciVar, '\\d{4}')), source = 'WHO') |>
+     select(-InciVar) |> 
+     # add UHC index by year and location
+     left_join(uhc_data, by = c('location_name' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
 
 gbd_long <- DataAll |>
-     select(location_id, starts_with('GBD_Cases_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant, starts_with('Population_')) |>
-     pivot_longer(cols = matches('GBD_Cases_\\d{4}'), names_to = 'CasesVar', values_to = 'Cases') |>
-     mutate(Year = as.integer(str_extract(CasesVar, '\\d{4}')), source = 'GBD') |>
-     select(-CasesVar)
+     select(location_id, Location_ID, location_name, starts_with('GBD_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
+     pivot_longer(cols = matches('GBD_Inci_\\d{4}'), names_to = 'InciVar', values_to = 'Incidence') |>
+     mutate(Year = as.integer(str_extract(InciVar, '\\d{4}')), source = 'GBD') |>
+     select(-InciVar) |> 
+     # add UHC index by year and location
+     left_join(uhc_data, by = c('location_name' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
+
+population_long <- DataAll |>
+     select(location_id, Location_ID, starts_with('Population_')) |>
+     pivot_longer(cols = matches('Population_\\d{4}'), names_to = 'PopVar', values_to = 'Population') |>
+     mutate(Year = as.integer(str_extract(PopVar, '\\d{4}'))) |>
+     select(-PopVar)
 
 DataLongCounts <- bind_rows(who_long, gbd_long) |>
-     # attach population by year
-     mutate(PopVar = paste0('Population_', Year)) |>
-     rowwise() |>
-     mutate(Population = as.numeric(cur_data_all()[[PopVar]])) |>
-     ungroup() |>
-     select(-PopVar) |>
+     left_join(population_long, by = c('location_id', 'Location_ID', 'Year')) |>
      # keep only years of interest and ensure predictors are factors
      filter(Year %in% c(2019, 2021, 2024)) |>
      mutate(
-          VaccineDose = factor(VaccineDose),
-          TimeFirstShotG = factor(TimeFirstShotG),
-          TimeLastShotG = factor(TimeLastShotG),
-          VaccinePregnant = factor(VaccinePregnant),
-          source = factor(source)
+          VaccineDose = factor(VaccineDose, levels = levels(DataAll$VaccineDose)),
+          TimeFirstShotG = factor(TimeFirstShotG, levels = levels(DataAll$TimeFirstShotG)),
+          TimeLastShotG = factor(TimeLastShotG, levels = levels(DataAll$TimeLastShotG)),
+          VaccinePregnant = factor(VaccinePregnant, levels = rev(levels(DataAll$VaccinePregnant)))
      ) |>
-     filter(!is.na(Cases) & !is.na(Population) & Population > 0)
+     filter(!is.na(Incidence) & !is.na(Population) & Population > 0)
 
 # Prepare a log-transformed incidence outcome for Bayesian hierarchical Gaussian models
 # we add a small offset to Cases to avoid log(0); compute rate per person and take log
 DataLongRates <- DataLongCounts |>
      mutate(
-          Cases_adj = Cases + 0.5,
-          rate = Cases_adj / Population,
+          rate = (Incidence * Population + 0.5) / Population,  # incidence per person with 0.5 offset
           log_rate = log(rate)
      ) |>
      # ensure region is available and use as factor; Region was joined into DataAll earlier
-     left_join(DataAll |> select(location_id, Region), by = 'location_id') |>
+     left_join(DataAll |> select(location_id, Location_ID, Region), by = c('location_id', 'Location_ID')) |>
      mutate(
           Region = ifelse(is.na(Region), 'Unknown', Region),
           Region = factor(Region),
+          uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat),
+          uhc_cat = factor(uhc_cat, levels = c('Very low', 'Low', 'Medium', 'High', 'Very high', 'Unknown')),
           location_id = factor(location_id)
      )
 
+# Fit ---------------------------------------------------------------------
+
+car::vif(lm(log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG +
+                 VaccinePregnant + uhc_index, data = DataLongRates))
+
 # Bayesian hierarchical Gaussian model (log-rate outcome) using brms
-# formula: log_rate ~ covariates + (1 | Region/location_id)
 fit_bayes_hier_gaussian <- function(df, year, source = NULL, min_obs = 10) {
      dsub <- df |> filter(Year == year)
      if(!is.null(source)) dsub <- dsub |> filter(source == !!source)
@@ -171,14 +132,14 @@ fit_bayes_hier_gaussian <- function(df, year, source = NULL, min_obs = 10) {
 
      # covariates: VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant
      # nested random intercepts: (1 | Region/location_id)
-     fmla <- as.formula('log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG + VaccinePregnant + (1 | Region/location_id)')
+     fmla <- as.formula('log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG + VaccinePregnant + uhc_cat + (1|Region/location_id)')
 
      # weakly informative priors as specified
      priors <- c(
-          prior(normal(0, 2), class = 'b'),
-          prior(normal(0, 2), class = 'Intercept'),
-          prior(normal(0, 2), class = 'sigma'),
-          prior(normal(0, 2), class = 'sd')
+          prior(normal(0, 0.35), class = "b"),
+          prior(normal(0, 2), class = "Intercept"),
+          prior(normal(0, 2), class = "sigma"),
+          prior(normal(0, 2), class = "sd")
      )
 
      # increase cores for sampling
@@ -248,9 +209,6 @@ results_bayes_all <- imap_dfr(bayes_results, ~ mutate(.x, model = .y)) |>
 results_bayes_all <- results_bayes_all |>
      mutate(rr_median = exp(median), rr_lower = exp(lower), rr_upper = exp(upper))
 
-# write numeric summary
-write.csv(results_bayes_all, file = './Output/Results_Bayes_Hier_Gaussian.csv')
-
 # save combined models+summary object for reproducibility
 saveRDS(list(models = bayes_models, summary = results_bayes_all),
         file = './Output/bayes_models_and_summary.rds')
@@ -259,16 +217,21 @@ saveRDS(list(models = bayes_models, summary = results_bayes_all),
 plot_df <- results_bayes_all |> filter(!term %in% c('Intercept')) |> 
      mutate(term = factor(term, levels = unique(term)))
 
-if(nrow(plot_df) > 0) {
-     p_forest <- ggplot(plot_df, aes(x = term, y = rr_median, ymin = rr_lower, ymax = rr_upper, color = source)) +
-          geom_pointrange(position = position_dodge(width = 0.6), size = 0.6) +
-          geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
-          coord_flip() +
-          facet_wrap(~ year, scales = 'free_y') +
-          scale_y_log10() +
-          labs(x = NULL, y = 'Rate ratio (exp(coef))', title = 'Posterior rate ratios (median and 95% CI)') +
-          theme_minimal() +
-          theme(legend.position = 'bottom')
-     
-     ggsave('./Output/forest_fixed_effects_bayes.png', p_forest, width = 10, height = 6, dpi = 300)
-}
+p_forest <- ggplot(plot_df, aes(x = term, y = rr_median, ymin = rr_lower, ymax = rr_upper, color = source)) +
+     geom_pointrange(position = position_dodge(width = 0.6), size = 0.6) +
+     geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
+     coord_flip() +
+     facet_wrap(~ year, scales = 'fixed') +
+     scale_y_log10() +
+     scale_x_discrete(limits = rev(levels(plot_df$term))) +
+     labs(x = NULL, y = 'Rate ratio (exp(coef))', title = 'Posterior rate ratios (median and 95% CI)') +
+     theme_minimal() +
+     theme(legend.position = 'bottom')
+
+ggsave('./Output/Figure 5.png',
+       p_forest,
+       width = 10, height = 6, dpi = 300)
+
+# write numeric summary
+write.csv(results_bayes_all,
+          file = './Output/Figure 5.xlsx')
