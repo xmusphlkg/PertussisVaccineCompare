@@ -94,7 +94,7 @@ p1 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'A: Routine vaccine doses',
+     labs(title = 'A: Number of Vaccine Doses',
           x = NULL,
           y = 'NUmber of countries')
 
@@ -132,7 +132,7 @@ p3 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'B: First dose timing',
+     labs(title = 'B: Time to First Shot',
           x = NULL,
           y = 'Number of countries')
 
@@ -170,7 +170,7 @@ p5 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'C: Last dose timing',
+     labs(title = 'C: Time ti Last Shot',
           x = NULL,
           y = 'Number of countries',
           fill = 'Time to last dose')

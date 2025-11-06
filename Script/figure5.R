@@ -215,7 +215,21 @@ saveRDS(list(models = bayes_models, summary = results_bayes_all),
 
 # create a forest plot of rate ratios for non-intercept terms
 plot_df <- results_bayes_all |> filter(!term %in% c('Intercept')) |> 
-     mutate(term = factor(term, levels = unique(term)))
+     mutate(group = case_when(grepl('^VaccineDose', term) ~ 'Vaccine Doses',
+                              grepl('^TimeFirstShotG', term) ~ 'Time to First Shot',
+                              grepl('^TimeLastShotG', term) ~ 'Time to Last Shot',
+                              grepl('^VaccinePregnant', term) ~ 'Maternal Vaccination',
+                              TRUE ~ term),
+            trem_clean = case_when(grepl('^VaccineDose', term) ~ sub('^VaccineDose', '', term),
+                                   term == 'TimeFirstShotG1.52.5m' ~ '[1.5,2.5)m',
+                                   term == 'TimeFirstShotG2.53.0m' ~ '[2.5,3.0]m',
+                                   term == 'TimeLastShotG12y' ~ '[1,2]y',
+                                   term == 'TimeLastShotG35y' ~ '[3,5]y',
+                                   term == 'TimeLastShotG612y' ~ '[6,12]y',
+                                   term == 'TimeLastShotG1318y' ~ '[13,18]y',
+                                   term == 'VaccinePregnantRecommended' ~ 'Recommended',
+                                   TRUE ~ term))
+            
 
 labs_vars_y <- c('Incidence rate, 2019 (WHO)', 
                  'Incidence rate, 2021 (WHO)', 
@@ -228,40 +242,33 @@ names(fill_color) <- labs_vars_y
 
 plot_function <- function(i){
      outcome <- plot_df |> 
-          filter(year == combos_bayes$Year[i] & source == combos_bayes$source[i]) |> 
-          ggplot(aes(x = term, y = rr_median, ymin = rr_lower, ymax = rr_upper,
-                     color = factor(labs_vars_y[i], levels = labs_vars_y))) +
-          geom_pointrange(position = position_dodge(width = 0.6), size = 0.6, show.legend = T) +
+          filter(group == unique(plot_df$group)[i]) |> 
+          mutate(source = factor(paste0(source, ' ', year),
+                                 levels = c('WHO 2019', 'WHO 2021', 'WHO 2024', 'GBD 2019', 'GBD 2021'),
+                                 labels = labs_vars_y)) |> 
+          ggplot(aes(x = trem_clean, y = rr_median, ymin = rr_lower, ymax = rr_upper,
+                     color = source)) +
+          geom_pointrange(position = position_dodge(width = 0.6), show.legend = T) +
+          geom_line(aes(group = source), position = position_dodge(width = 0.6), show.legend = F) +
           geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
-          coord_flip() +
           scale_y_log10(limits = range(c(plot_df$rr_lower, plot_df$rr_upper))) +
-          scale_x_discrete(limits = rev(levels(plot_df$term)),
-                           labels = rev(c('4 doses', '5  doses', '6 doses', '[1.5,2.5)m', '[2.5,3.0]m',
-                                      '[1,2]y', '[3,5]y', '[6,12]y', '[13,18]y', 'Maternal vacination'))) +
           scale_color_manual(values = fill_color,
                              drop = F) +
-          labs(x = NULL, y = 'Rate ratio', title = LETTERS[i], color = NULL)+
+          labs(x = unique(plot_df$group)[i],
+               y = 'Adjusted Rate Ratio (95% CrI)',
+               title = LETTERS[i],
+               color = 'Data Source')+
           theme_bw() +
-          guides(color = guide_legend(ncol = 1))
-     
-     if (!i %in% c(1, 4)) {
-          outcome <- outcome +
-               theme(axis.text.y = element_blank())
-     } else {
-          outcome <- outcome +
-               theme(plot.margin = unit(c(5.5, 5.5, 5.5, 50), "pt"))
-          
-     }
+          guides(color = guide_legend(nrow = 1))
      
      outcome
 }
 
-fig <- lapply(seq_len(nrow(combos_bayes)), plot_function)
-
-fig[[nrow(combos_bayes)+1]] <- guide_area()
+fig <- lapply(seq_len(length(unique(plot_df$group))), plot_function)
 
 # increase right margin
-fig <- wrap_plots(fig, ncol = 3, guides = 'collect', axis = 'collect')
+fig <- wrap_plots(fig, ncol = 2, guides = 'collect')&
+     theme(legend.position = 'bottom')
 
 ggsave('./Output/Figure 5.png',
        fig,
@@ -274,5 +281,5 @@ ggsave('./Output/Figure 5.pdf',
        family = "Helvetica")
 
 # write numeric summary
-write.csv(results_bayes_all,
-          file = './Output/Figure 5.xlsx')
+write.xlsx(results_bayes_all,
+           file = './Output/Figure 5.xlsx')
