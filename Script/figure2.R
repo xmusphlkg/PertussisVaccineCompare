@@ -94,9 +94,9 @@ p1 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'A: Number of Vaccine Doses',
+     labs(title = 'A: Number of scheduled doses',
           x = NULL,
-          y = 'NUmber of countries')
+          y = 'Number of countries')
 
 p2 <- ggplot(DataMapPlot) +
      geom_sf(data = DataMapBorder, color = 'grey', fill = NA) +
@@ -132,7 +132,7 @@ p3 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'B: Time to First Shot',
+     labs(title = 'B: Timing of first scheduled dose',
           x = NULL,
           y = 'Number of countries')
 
@@ -170,10 +170,10 @@ p5 <- ggplot(Data) +
      theme_bw()+
      theme(plot.title.position = 'plot',
            legend.position = 'none')+
-     labs(title = 'C: Time ti Last Shot',
+     labs(title = 'C: Timing of last scheduled childhood dose',
           x = NULL,
           y = 'Number of countries',
-          fill = 'Time to last dose')
+          fill = 'Timing of last childhood dose')
 
 p6 <- ggplot(DataMapPlot) +
      geom_sf(data = DataMapBorder, color = 'grey', fill = NA) +
@@ -189,7 +189,7 @@ p6 <- ggplot(DataMapPlot) +
 # combine plots
 
 fig <- p1 + p2 + p3 + p4 + p5 + p6 +
-     plot_layout(ncol = 2, nrow = 3, byrow = TRUE, widths = c(0.45, 1))
+     plot_layout(ncol = 2, nrow = 3, byrow = TRUE, widths = c(0.5, 1))
 
 # save
 ggsave('./Output/Figure 2.png',

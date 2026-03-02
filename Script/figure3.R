@@ -58,18 +58,20 @@ fill_color <- c("#2A6EBB", "#F0AB00")
 
 p1 <- ggplot(DataMapPlot) +
      geom_sf(data = DataMapBorder, color = 'grey', fill = NA) +
-     geom_sf(aes(fill = VaccinePregnant), color = 'white') +
+     geom_sf(aes(fill = VaccinePregnant)) +
      coord_sf(xlim = c(-180, 180), ylim = c(-60, 90), expand = FALSE) +
      scale_fill_manual(values = fill_color,
                        na.translate = FALSE,
-                       na.value = 'grey') +
+                       na.value = 'white') +
      labs(title = 'A',
           fill = NULL) +
      ggthemes::theme_map()+
      theme(legend.position = 'inside',
-           legend.justification.inside = 'bottom',
            plot.background = element_rect(fill = 'white', color = NA),
-           legend.position.inside = c(0.1, 0.1),
+           legend.position.inside = c(0.05, 0.1),
+           legend.justification.inside = c(0, 0),
+           legend.key.size = unit(0.4, "cm"),
+           legend.spacing.y = unit(0.1, "cm"),
            plot.margin = margin(t = 5, r = 10, b = 5, l = 10),
            panel.border = element_rect(fill = NA, color = 'black'))
 
@@ -167,14 +169,14 @@ p2 <- p2_1 + p2_2 +
 
 # save
 ggsave('./Output/Figure 3.png',
-       plot = cowplot::plot_grid(p1, p2, ncol = 1, rel_heights = c(0.54, 1)),
+       plot = cowplot::plot_grid(p1, p2, ncol = 1, rel_heights = c(0.65, 1)),
        # plot = p1 / p2,
-       width = 7, height = 9.3, dpi = 300)
+       width = 6, height = 7.2, dpi = 300)
 
 ggsave('./Output/Figure 3.pdf',
-       plot = cowplot::plot_grid(p1, p2, ncol = 1, rel_heights = c(0.54, 1)),
+       plot = cowplot::plot_grid(p1, p2, ncol = 1, rel_heights = c(0.65, 1)),
        # plot = p1 / p2,
-       width = 7, height = 9.3,
+       width = 6, height = 7.2,
        device = cairo_pdf,
        family = "Helvetica")
 

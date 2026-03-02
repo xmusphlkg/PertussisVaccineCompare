@@ -243,7 +243,7 @@ panel_line_function <- function(i){
           scale_fill_manual(values = fill_color_source) +
           labs(title = paste(LETTERS[i], region_names[i], sep = ': '),
                x = NULL,
-               y = "Incidence rate (per 100,000 population)") +
+               y = "Incidence rate per 100,000 population") +
           theme_bw()+
           theme(panel.grid = element_blank(),
                 legend.position = ifelse(i == 1, 'inside', 'none'),
