@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-22 09:01:50
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2025-11-01 11:29:24
+## @LastEditTime: 2026-03-02 18:53:42
 #####################################
 
 # packages ----------------------------------------------------------------
@@ -145,6 +145,13 @@ df_incidence_gbd_region <- df_incidence_gbd_region |>
      mutate(Source = 'GBD') |> 
      arrange(Location, Year)
 
+# GBD all-age (crude) incidence rate - for construct-alignment sensitivity
+df_incidence_gbd_region_allage <- read.csv('./Data/IHME-GBD_2021_DATA-629ff673-1.csv') |> 
+     filter(!location_name %in% "WHO region", measure_name != "Deaths", age_name == 'All ages', metric_name == 'Rate') |>
+     select(Location = location_name, Year = year, Incidence = val, lower, upper) |> 
+     mutate(Source = 'GBD all-age') |> 
+     arrange(Location, Year)
+
 ## bind data ---------------------------------------------------------------
 
 df_incidence_region <- rbind(df_incidence_who_region, df_incidence_gbd_region) |> 
@@ -188,6 +195,20 @@ model_incidence_gbd_region <- joinpoint(df_incidence_gbd_region |> filter(Locati
                                         run_opt = run_opt_gbd,
                                         export_opt = export_opt_gbd)
 
+## build joinpoint model for GBD all-age data (sensitivity)
+model_incidence_gbd_allage_global <- joinpoint(df_incidence_gbd_region_allage |> filter(Location == 'Global', Year %in% 2000:2019),
+                                               Year,
+                                               Incidence,
+                                               run_opt = run_opt_gbd,
+                                               export_opt = export_opt_gbd)
+
+model_incidence_gbd_allage_region <- joinpoint(df_incidence_gbd_region_allage |> filter(Location != 'Global', Year %in% 2000:2019),
+                                               Year,
+                                               Incidence,
+                                               by = Location,
+                                               run_opt = run_opt_gbd,
+                                               export_opt = export_opt_gbd)
+
 # clean data
 df_aapc_who <- rbind(get_aapc(model_incidence_who_global) |> mutate(location = 'Global'),
                      get_aapc(model_incidence_who_region)) |>
@@ -197,6 +218,12 @@ df_aapc_who <- rbind(get_aapc(model_incidence_who_global) |> mutate(location = '
 
 df_aapc_gbd <- rbind(get_aapc(model_incidence_gbd_global) |> mutate(location = 'Global'),
                      get_aapc(model_incidence_gbd_region)) |>
+     mutate(`AAPC (95%CI)` = paste0(aapc, p_value_label),
+            aapc = as.numeric(aapc),
+            location = factor(location, levels = region_names))
+
+df_aapc_gbd_allage <- rbind(get_aapc(model_incidence_gbd_allage_global) |> mutate(location = 'Global'),
+                            get_aapc(model_incidence_gbd_allage_region)) |>
      mutate(`AAPC (95%CI)` = paste0(aapc, p_value_label),
             aapc = as.numeric(aapc),
             location = factor(location, levels = region_names))
@@ -243,7 +270,7 @@ panel_line_function <- function(i){
           scale_fill_manual(values = fill_color_source) +
           labs(title = paste(LETTERS[i], region_names[i], sep = ': '),
                x = NULL,
-               y = "Incidence rate per 100,000 population") +
+               y = if (i == 4) "Incidence rate per 100,000 population" else NULL) +
           theme_bw()+
           theme(panel.grid = element_blank(),
                 legend.position = ifelse(i == 1, 'inside', 'none'),
@@ -257,13 +284,6 @@ panel_line_function <- function(i){
 # create panels
 fig1 <- lapply(1:length(region_names), panel_line_function)
 
-ggsave('./Output/Figure1_1.pdf',
-       wrap_plots(fig1, ncol = 3, axis_titles = 'collect'),
-       width = 12,
-       height = 8,
-       device = cairo_pdf,
-       family = 'Helvetica')
-
 # panel heatmap -----------------------------------------------------------
 
 heatmap_breaks <- pretty(c(df_aapc_gbd$aapc, df_aapc_who$aapc))
@@ -274,12 +294,13 @@ panel_heatmap_function <- function(i){
           mutate(Year = str_replace(Year, '~20', '~'))
      
      ggplot(data_aapc, aes(x = Year, y = location, fill = aapc)) +
-          geom_tile(color = "white") +
+          geom_tile(color = "white", show.legend = i == 2) +
           geom_text(aes(label = `AAPC (95%CI)`), color = "black", size = 3) +
           scale_fill_gradientn(colors = fill_color_heatmap,
                                breaks = heatmap_breaks,
                                limits = range(heatmap_breaks),
                                name = "AAPC") +
+          # coord_cartesian(ratio = 1/2)+
           scale_y_discrete(limits = rev(levels(data_aapc$location)),
                            expand = c(0,0)) +
           scale_x_discrete(expand = c(0,0)) +
@@ -290,7 +311,7 @@ panel_heatmap_function <- function(i){
                y = NULL) +
           theme_bw()+
           theme(legend.position = 'right',
-                plot.title.position = "plot",
+                axis.text.y = if(i == 1) element_text(hjust = 1) else element_blank(),
                 panel.grid = element_blank())+
           guides(fill = guide_colorbar(barwidth = 0.7, barheight = 8, title.position = "top"))
 }
@@ -298,16 +319,13 @@ panel_heatmap_function <- function(i){
 # create panels
 fig2 <- lapply(1:2, panel_heatmap_function)
 
-ggsave('./Output/Figure1_2.pdf',
-       wrap_plots(fig2, ncol = 2, axes = 'collect_y', guides = 'collect')&
-            theme(legend.position = 'right'),
-       width = 8,
-       height = 8/3,
-       device = cairo_pdf,
-       family = 'Helvetica')
+design <- "
+ABC
+DEF
+GHH"
 
-fig <- wrap_plots(c(fig1, fig2),
-                  nrow = 3)
+fig <- c(fig1, free(wrap_plots(fig2))) |> 
+     wrap_plots(ncol = 3, byrow = TRUE, design = design)
 
 # save figure
 ggsave('./Output/Figure 1.png',
@@ -315,3 +333,111 @@ ggsave('./Output/Figure 1.png',
        width = 12,
        height = 8,
        dpi = 300)
+
+ggsave('./Output/Figure 1.pdf',
+       fig,
+       width = 12,
+       height = 8,
+       device = cairo_pdf,
+       family = 'Helvetica')
+
+# -------------------------------------------------------------------------
+# Sensitivity analysis: WHO crude vs GBD all-age (crude)
+# Output as Supplement Figure S1 (trend + AAPC heatmap)
+
+fill_color_source_sens <- c("#2A6EBB", "#69BE28")
+names(fill_color_source_sens) <- c("WHO", "GBD all-age")
+
+panel_line_function_sens <- function(i) {
+     data_region <- rbind(
+          df_incidence_who_region |> mutate(Source = "WHO"),
+          df_incidence_gbd_region_allage
+     ) |>
+          filter(Location == region_names[i])
+     breaks <- pretty(c(0, data_region$Incidence, data_region$upper))
+     
+     if (region_names[i] == 'Global') {
+          data_region_jp <- rbind(
+               model_incidence_who_global$data_export |> mutate(Source = 'WHO'),
+               model_incidence_gbd_allage_global$data_export |> mutate(Source = 'GBD all-age')
+          )
+     } else {
+          data_region_jp <- rbind(
+               model_incidence_who_region$data_export |> mutate(Source = 'WHO'),
+               model_incidence_gbd_allage_region$data_export |> mutate(Source = 'GBD all-age')
+          ) |>
+               filter(location == region_names[i]) |>
+               select(-location)
+     }
+     
+     ggplot(data_region, aes(x = Year, y = Incidence, color = Source)) +
+          geom_point() +
+          geom_linerange(aes(ymin = lower, ymax = upper)) +
+          geom_line(data = data_region_jp,
+                    aes(x = year, y = model, color = Source)) +
+          scale_y_continuous(breaks = breaks, limits = range(breaks), expand = c(0, 0)) +
+          scale_x_continuous(breaks = seq(2000, 2025, by = 5), limits = c(2000, 2025),
+                             expand = expansion(add = c(1, 0))) +
+          scale_color_manual(values = fill_color_source_sens) +
+          labs(title = paste0(LETTERS[i], ': ', region_names[i]),
+               x = NULL,
+               y = "Incidence rate per 100,000 population") +
+          theme_bw() +
+          theme(panel.grid = element_blank(),
+                legend.position = ifelse(i == 1, 'inside', 'none'),
+                legend.background = element_rect(fill = 'transparent'),
+                legend.justification.inside = c(1, 1),
+                legend.position.inside = c(0.99, 0.99)) +
+          guides(color = guide_legend(title = "Data Source", nrow = 1))
+}
+
+figS1_line <- lapply(1:length(region_names), panel_line_function_sens)
+
+# ggsave('./Output/Supplement_Figure_S1_1.png',
+#      wrap_plots(figS1_line, ncol = 3, axis_titles = 'collect'),
+#      width = 12,
+#      height = 8,
+#      dpi = 300)
+
+# AAPC heatmap for GBD all-age
+heatmap_breaks_sens <- pretty(df_aapc_gbd_allage$aapc)
+
+data_aapc_sens <- df_aapc_gbd_allage |>
+     mutate(Year = str_replace(Year, '~20', '~'))
+
+figS1_heat <- ggplot(data_aapc_sens, aes(x = Year, y = location, fill = aapc)) +
+     geom_tile(color = "white") +
+     geom_text(aes(label = `AAPC (95%CI)`), color = "black", size = 3) +
+     scale_fill_gradientn(colors = fill_color_heatmap,
+                          breaks = heatmap_breaks_sens,
+                          limits = range(heatmap_breaks_sens),
+                          name = "AAPC") +
+     scale_y_discrete(limits = rev(levels(data_aapc_sens$location)),
+                      expand = c(0, 0)) +
+     scale_x_discrete(expand = c(0, 0)) +
+     # coord_cartesian(clip = 'off', ratio = 1/2) +
+     labs(title = 'G: GBD all-age',
+          x = "Period",
+          y = NULL) +
+     theme_bw() +
+     theme(legend.position = 'right',
+           plot.title.position = "plot",
+           axis.text.y = element_blank(),
+           panel.grid = element_blank()) +
+     guides(fill = guide_colorbar(barwidth = 0.7, barheight = 8, title.position = "top"))
+
+figS1 <- wrap_plots(c(figS1_line, free(wrap_plots(list(fig2[[1]], figS1_heat)))),
+                    design = design,
+                    axis_titles = 'collect',
+                    ncol = 3)
+
+ggsave('./Output/Supplement_Figure_S1.png',
+       figS1,
+       width = 12,
+       height = 8,
+       dpi = 300)
+
+# write sensitivity AAPC table
+write.xlsx(df_aapc_gbd_allage,
+           file = './Output/Supplement_Figure_S1_AAPC_GBD_allage.xlsx',
+           overwrite = TRUE)

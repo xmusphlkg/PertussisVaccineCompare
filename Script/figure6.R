@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2026-03-02
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2026-03-02
+## @LastEditTime: 2026-03-02 18:58:00
 #####################################
 
 # packages ----------------------------------------------------------------
@@ -46,7 +46,7 @@ DataDTP <- DataCoverage |>
 # long-format incidence by source/year -----------------------------------
 
 who_long <- DataAll |>
-     select(Location_ID, location_name, starts_with("WHO_Inci_")) |>
+     select(Location_ID, location_name = Location, starts_with("WHO_Inci_")) |>
      pivot_longer(
           cols      = matches("WHO_Inci_\\d{4}"),
           names_to  = "InciVar",
@@ -59,7 +59,7 @@ who_long <- DataAll |>
      select(-InciVar)
 
 gbd_long <- DataAll |>
-     select(Location_ID, location_name, starts_with("GBD_Inci_")) |>
+     select(Location_ID, location_name = Location, starts_with("GBD_Inci_")) |>
      pivot_longer(
           cols      = matches("GBD_Inci_\\d{4}"),
           names_to  = "InciVar",
@@ -72,6 +72,24 @@ gbd_long <- DataAll |>
      select(-InciVar)
 
 DataLong <- bind_rows(who_long, gbd_long) |>
+     filter(Year %in% c(2019, 2021, 2024)) |>
+     left_join(DataDTP, by = c("Location_ID", "Year")) |>
+     filter(!is.na(Incidence), !is.na(DTP1), !is.na(DTP3))
+
+# sensitivity dataset: GBD all-age (crude) incidence (requires Figure 4 to have
+# created GBD_AllAge_Inci_* columns in DataAll.RData)
+gbd_allage_long <- DataAll |>
+     select(Location_ID, location_name = Location, starts_with("GBD_AllAge_Inci_")) |>
+     pivot_longer(
+          cols      = matches("GBD_AllAge_Inci_\\d{4}"),
+          names_to  = "InciVar",
+          values_to = "Incidence"
+     ) |>
+     mutate(
+          Year   = as.integer(stringr::str_extract(InciVar, "\\d{4}")),
+          source = "GBD all-age"
+     ) |>
+     select(-InciVar) |>
      filter(Year %in% c(2019, 2021, 2024)) |>
      left_join(DataDTP, by = c("Location_ID", "Year")) |>
      filter(!is.na(Incidence), !is.na(DTP1), !is.na(DTP3))
@@ -247,22 +265,11 @@ for (cv in covars_use) {
 dtp_boot_summary <- if (length(dtp_boot_list) > 0) bind_rows(dtp_boot_list) else NULL
 dtp_p_values     <- if (length(dtp_p_list) > 0) bind_rows(dtp_p_list) else NULL
 
-# save numeric summaries for reproducibility
-if (!is.null(dtp_boot_summary)) {
-     write.xlsx(dtp_boot_summary,
-                file = "./Output/Figure 6_dtp_group_bootstrap.xlsx",
-                overwrite = TRUE)
-}
-
-if (!is.null(dtp_p_values)) {
-     write.xlsx(dtp_p_values,
-                file = "./Output/Figure 6_dtp_group_pvalues.xlsx",
-                overwrite = TRUE)
-}
+write.xlsx(list(dtp_boot_summary, dtp_p_values),
+           file = "./Output/Figure 6.xlsx",
+           overwrite = TRUE)
 
 # visualization -----------------------------------------------------------
-
-## 1) Scatter plots (continuous coverage vs incidence, no facets) ---------
 
 make_scatter_panels <- function(cov_var, cov_label, letter_offset = 0) {
      lapply(seq_along(years_use), function(i) {
@@ -274,7 +281,7 @@ make_scatter_panels <- function(cov_var, cov_label, letter_offset = 0) {
                geom_point(alpha = 0.6, size = 1.2, show.legend = F) +
                geom_smooth(method = "loess", se = FALSE, show.legend = F) +
                scale_y_log10(labels = function(x) format(x, scientific = FALSE)) +
-               scale_x_continuous(limits = c(20, 100), breaks = seq(20, 100, by = 20)) +
+               scale_x_continuous(limits = c(40, 100), breaks = seq(40, 100, by = 20)) +
                labs(
                     x = paste0(cov_label, " coverage (%)"),
                     y = "Incidence rate per 100,000 population",
@@ -364,3 +371,30 @@ ggsave("./Output/Figure 6.pdf",
        width = 12, height = 12,
        device = cairo_pdf,
        family = "Helvetica")
+
+# Sensitivity figure (Supplement Figure S2): GBD all-age (crude) only
+# Keep it lightweight: DTP3 vs incidence, years 2019 & 2021.
+DataLong_allage_s2 <- gbd_allage_long |>
+     filter(Year %in% c(2019, 2021)) |>
+     mutate(year = factor(Year, levels = c(2019, 2021)))
+
+fill_year_s2 <- c("2019" = "#7D5CC6", "2021" = "#E37222")
+
+p_s2 <- ggplot(DataLong_allage_s2, aes(x = DTP3, y = Incidence, colour = year)) +
+     geom_point(alpha = 0.6, size = 1.2, show.legend = TRUE) +
+     geom_smooth(method = "loess", se = FALSE, show.legend = FALSE) +
+     scale_y_log10(labels = function(x) format(x, scientific = FALSE)) +
+     scale_x_continuous(limits = c(40, 100), breaks = seq(40, 100, by = 20)) +
+     scale_color_manual(values = fill_year_s2) +
+     labs(
+          x = "DTP3 coverage (%)",
+          y = "Incidence rate per 100,000 population",
+          colour = "Year"
+     ) +
+     theme_bw() +
+     theme(panel.grid = element_blank(),
+           legend.position = "top")
+
+ggsave("./Output/Supplement_Figure_S2.png",
+       plot = p_s2,
+       width = 6, height = 4, dpi = 300)

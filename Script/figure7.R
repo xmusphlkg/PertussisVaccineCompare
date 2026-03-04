@@ -4,7 +4,7 @@
 ## @Author: Li Kangguo
 ## @Date: 2025-10-22 11:08:31
 ## @LastEditors: Li Kangguo
-## @LastEditTime: 2026-03-02 11:43:08
+## @LastEditTime: 2026-03-02 19:10:17
 #####################################
 
 library(tidyverse)
@@ -29,9 +29,12 @@ region_names <- c("Global", 'WHO region',
 load('./Output/DataAll.RData')
 
 DataAll <- DataAll |>
-     select(location_id, location_name, Location, Location_ID, ISO2, 
+     select(location_id, Location, Location_ID, ISO2, 
             VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant,
-            contains('WHO_Inci_'), contains('GBD_Inci_'), contains('Population_'))
+            contains('WHO_Inci_'), contains('GBD_Inci_'), contains('GBD_AllAge_Inci_'), contains('Population_'))
+
+# NOTE: Figure 4 pipeline now also exports GBD all-age incidence as
+# `GBD_AllAge_Inci_YYYY` into DataAll.RData (used for sensitivity analyses)
 
 ## DTP coverage ------------------------------------------------------------
 
@@ -74,7 +77,8 @@ rm(unpop, unpop_map)
 
 # attach UHC service coverage index data: https://data.who.int/indicators/i/3805B1E/9A706FD
 uhc_data <- read.csv("./Data/UHC service coverage index.csv") |>
-     select(Year = DIM_TIME, GEO_NAME_SHORT, uhc_index = INDEX_N)
+     select(Year = DIM_TIME, GEO_NAME_SHORT, uhc_index = INDEX_N) |> 
+     filter(Year %in% c(2019, 2021))
 
 # using 2021 data to replace 2024 value
 uhc_2024 <- uhc_data |>
@@ -95,20 +99,28 @@ rm(uhc_2024)
 ## Build long dataset stacking WHO and GBD Inci data with a `source` column
 # pivot WHO and GBD incidence columns separately, then bind_rows into a long table
 who_long <- DataAll |>
-     select(location_id, Location_ID, location_name, starts_with('WHO_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
+     select(location_id, Location_ID, Location, starts_with('WHO_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
      pivot_longer(cols = matches('WHO_Inci_\\d{4}'), names_to = 'InciVar', values_to = 'Incidence') |>
      mutate(Year = as.integer(str_extract(InciVar, '\\d{4}')), source = 'WHO') |>
      select(-InciVar) |> 
      # add UHC index by year and location
-     left_join(uhc_data, by = c('location_name' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
+     left_join(uhc_data, by = c('Location' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
 
 gbd_long <- DataAll |>
-     select(location_id, Location_ID, location_name, starts_with('GBD_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
+     select(location_id, Location_ID, Location, starts_with('GBD_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
      pivot_longer(cols = matches('GBD_Inci_\\d{4}'), names_to = 'InciVar', values_to = 'Incidence') |>
      mutate(Year = as.integer(str_extract(InciVar, '\\d{4}')), source = 'GBD') |>
      select(-InciVar) |> 
      # add UHC index by year and location
-     left_join(uhc_data, by = c('location_name' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
+     left_join(uhc_data, by = c('Location' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
+
+# GBD all-age (crude) incidence for construct-alignment sensitivity
+gbd_allage_long <- DataAll |>
+     select(location_id, Location_ID, Location, starts_with('GBD_AllAge_Inci_'), VaccineDose, TimeFirstShotG, TimeLastShotG, VaccinePregnant) |>
+     pivot_longer(cols = matches('GBD_AllAge_Inci_\\d{4}'), names_to = 'InciVar', values_to = 'Incidence') |>
+     mutate(Year = as.integer(str_extract(InciVar, '\\d{4}')), source = 'GBD all-age') |>
+     select(-InciVar) |> 
+     left_join(uhc_data, by = c('Location' = 'GEO_NAME_SHORT', 'Year' = 'Year'))
 
 population_long <- DataAll |>
      select(location_id, Location_ID, starts_with('Population_')) |>
@@ -119,6 +131,18 @@ population_long <- DataAll |>
 DataLongCounts <- bind_rows(who_long, gbd_long) |>
      left_join(population_long, by = c('location_id', 'Location_ID', 'Year')) |>
      # keep only years of interest and ensure predictors are factors
+     filter(Year %in% c(2019, 2021, 2024)) |>
+     mutate(
+          VaccineDose = factor(VaccineDose, levels = levels(DataAll$VaccineDose)),
+          TimeFirstShotG = factor(TimeFirstShotG, levels = levels(DataAll$TimeFirstShotG)),
+          TimeLastShotG = factor(TimeLastShotG, levels = levels(DataAll$TimeLastShotG)),
+          VaccinePregnant = factor(VaccinePregnant, levels = rev(levels(DataAll$VaccinePregnant)))
+     ) |>
+     filter(!is.na(Incidence) & !is.na(Population) & Population > 0)
+
+# sensitivity dataset: replace GBD ASR with GBD all-age (crude)
+DataLongCounts_sens <- bind_rows(who_long, gbd_allage_long) |>
+     left_join(population_long, by = c('location_id', 'Location_ID', 'Year')) |>
      filter(Year %in% c(2019, 2021, 2024)) |>
      mutate(
           VaccineDose = factor(VaccineDose, levels = levels(DataAll$VaccineDose)),
@@ -140,13 +164,22 @@ DataLongRates <- DataLongCounts |>
      # add DTP coverage (DTP1, DTP3) by country-year
      left_join(DataDTP3 |> select(Location_ID, Year, DTP1, DTP3),
                by = c('Location_ID', 'Year')) |>
-     mutate(
-          Region = ifelse(is.na(Region), 'Unknown', Region),
-          Region = factor(Region),
-          uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat),
-          # scale DTP3 coverage per 10-percentage-point increase for interpretability
-          DTP3_10 = ifelse(is.na(DTP3), NA_real_, DTP3 / 10)
-     )
+     mutate(Region = ifelse(is.na(Region), 'Unknown', Region),
+            Region = factor(Region),
+            uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat),
+            # scale DTP3 coverage per 10-percentage-point increase for interpretability
+            DTP3_10 = ifelse(is.na(DTP3), NA_real_, DTP3 / 10))
+
+DataLongRates_sens <- DataLongCounts_sens |>
+     mutate(rate = (Incidence * Population + 0.5) / Population,
+            log_rate = log(rate)) |>
+     left_join(DataAll |> select(location_id, Location_ID, Region), by = c('location_id', 'Location_ID')) |>
+     left_join(DataDTP3 |> select(Location_ID, Year, DTP1, DTP3),
+               by = c('Location_ID', 'Year')) |>
+     mutate(Region = ifelse(is.na(Region), 'Unknown', Region),
+            Region = factor(Region),
+            uhc_cat = ifelse(is.na(uhc_cat), 'Unknown', uhc_cat),
+            DTP3_10 = ifelse(is.na(DTP3), NA_real_, DTP3 / 10))
 
 # Fit ---------------------------------------------------------------------
 
@@ -165,12 +198,15 @@ fit_bayes_hier_gaussian <- function(df, year, source = NULL, min_obs = 10) {
      # nested random intercepts: (1 | uhc_cat/location_id)
      fmla <- as.formula('log_rate ~ VaccineDose + TimeFirstShotG + TimeLastShotG + VaccinePregnant + DTP3_10 + (1|uhc_cat/location_id)')
 
-     # weakly informative priors as specified
+     # weakly informative priors (match manuscript)
+     # - fixed effects: N(0, 0.5^2)
+     # - intercept: N(0, 2^2)
+     # - residual SD and random-effect SDs: Exponential(1)
      priors <- c(
-          prior(normal(0, 2), class = "b"),
+          prior(normal(0, 0.5), class = "b"),
           prior(normal(0, 2), class = "Intercept"),
-          prior(normal(0, 2), class = "sigma"),
-          prior(normal(0, 2), class = "sd")
+          prior(exponential(1), class = "sigma"),
+          prior(exponential(1), class = "sd")
      )
 
      # increase cores for sampling
@@ -317,3 +353,101 @@ ggsave('./Output/Figure 7.pdf',
 # write numeric summary
 write.xlsx(results_bayes_all,
            file = './Output/Figure 7.xlsx')
+
+# Sensitivity -------------------------------------------------------------
+
+sens_out <- './Output/bayes_models_and_summary_gbd_allage.rds'
+
+if (file.exists(sens_out)) {
+     sens_obj <- readRDS(sens_out)
+     results_bayes_sens <- sens_obj$summary
+} else {
+     combos_sens <- DataLongRates_sens |>
+          filter(source == 'GBD all-age', Year %in% c(2019, 2021)) |>
+          group_by(source, Year) |>
+          summarise(n = n(), .groups = 'drop') |>
+          arrange(Year)
+     
+     bayes_models_sens <- list()
+     bayes_results_sens <- list()
+     for (r in seq_len(nrow(combos_sens))) {
+          src <- combos_sens$source[r]
+          yr  <- combos_sens$Year[r]
+          lab <- paste0('GBD_allage_', yr)
+          rds_path <- file.path('./Output', paste0('brms_hier_gaussian_', lab, '.rds'))
+          
+          if (file.exists(rds_path)) {
+               fit <- readRDS(rds_path)
+               post <- as.data.frame(posterior_samples(fit))
+               b_names <- names(post)[grepl('^b_', names(post))]
+               summaries <- map_dfr(b_names, function(nm) {
+                    draws <- post[[nm]]
+                    tibble(
+                         term = sub('^b_', '', nm),
+                         median = median(draws),
+                         lower = quantile(draws, 0.025),
+                         upper = quantile(draws, 0.975),
+                         pr_gt_zero = mean(draws > 0)
+                    )
+               }) |>
+                    mutate(year = as.integer(yr), source = src)
+               bayes_models_sens[[lab]] <- fit
+               bayes_results_sens[[lab]] <- summaries
+          } else {
+               res <- fit_bayes_hier_gaussian(DataLongRates_sens, as.integer(yr), source = src)
+               if (!is.null(res)) {
+                    bayes_models_sens[[lab]] <- res$fit
+                    bayes_results_sens[[lab]] <- res$summary
+                    saveRDS(res$fit, file = rds_path)
+               }
+          }
+     }
+     
+     results_bayes_sens <- imap_dfr(bayes_results_sens, ~ mutate(.x, model = .y)) |>
+          mutate(year = as.integer(year)) |>
+          select(model, source, year, term, median, lower, upper, pr_gt_zero) |>
+          mutate(rr_median = exp(median), rr_lower = exp(lower), rr_upper = exp(upper))
+     
+     saveRDS(list(models = bayes_models_sens, summary = results_bayes_sens),
+             file = sens_out)
+}
+
+sens_terms <- results_bayes_sens |>
+     filter(term %in% c('VaccinePregnantRecommended', 'DTP3_10')) |>
+     mutate(
+          term_label = case_when(
+               term == 'VaccinePregnantRecommended' ~ 'Maternal pertussis vaccination: Recommended vs Not recommended',
+               term == 'DTP3_10' ~ 'DTP3 coverage (per 10 percentage points)',
+               TRUE ~ term
+          ),
+          year = factor(year, levels = c(2019, 2021))
+     )
+
+write.xlsx(sens_terms,
+           file = './Output/Supplement_Figure_S3.xlsx',
+           overwrite = TRUE)
+
+plot_sens_term <- function(term_name, title_letter) {
+     d <- sens_terms |> filter(term == term_name)
+     ggplot(d, aes(x = year, y = rr_median, ymin = rr_lower, ymax = rr_upper, colour = year)) +
+          geom_pointrange(show.legend = FALSE) +
+          geom_hline(yintercept = 1, linetype = 'dashed', color = 'gray50') +
+          scale_y_log10() +
+          labs(
+               x = NULL,
+               y = 'Adjusted rate ratio (95% CrI)',
+               title = paste0(title_letter)
+          ) +
+          theme_bw() +
+          theme(panel.grid = element_blank())
+}
+
+p_s2_maternal <- plot_sens_term('VaccinePregnantRecommended', 'A')
+p_s2_dtp3 <- plot_sens_term('DTP3_10', 'B')
+
+fig_s2 <- wrap_plots(list(p_s2_maternal, p_s2_dtp3), ncol = 2)
+
+ggsave('./Output/Supplement_Figure_S3.png',
+       plot = fig_s2,
+       width = 10, height = 4,
+       dpi = 300)

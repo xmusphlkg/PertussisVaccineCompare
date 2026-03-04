@@ -1,0 +1,131 @@
+Figure 7 wide-interval diagnosis
+Run time: 2026-03-02 21:51:10
+
+# A. Interval width change (current vs HEAD)
+Top terms with widest *multiplicative* widening (excluding Intercept):
+# A tibble: 30 × 9
+   model    term            cur_rr_lower cur_rr_upper cur_width_rr base_rr_lower
+   <chr>    <chr>                  <dbl>        <dbl>        <dbl>         <dbl>
+ 1 WHO_2024 VaccineDose6          0.0432        14.7         340.          0.449
+ 2 WHO_2021 TimeFirstShotG…       0.454        146.          322.          0.512
+ 3 WHO_2019 VaccineDose6          0.214         58.8         275.          0.510
+ 4 WHO_2021 VaccineDose6          0.0363         9.65        266.          0.459
+ 5 WHO_2024 TimeLastShotG1…       1.39         349.          251.          0.670
+ 6 WHO_2019 TimeLastShotG1…       0.454        107.          235.          0.606
+ 7 WHO_2024 TimeFirstShotG…       1.35         325.          240.          0.540
+ 8 WHO_2019 TimeFirstShotG…       0.978        252.          258.          0.535
+ 9 WHO_2021 TimeLastShotG1…       0.0791        18.4         233.          0.462
+10 WHO_2021 TimeLastShotG1…       0.0371         8.00        216.          0.301
+11 WHO_2021 VaccineDose4          0.0232         4.38        188.          0.288
+12 WHO_2021 TimeLastShotG3…       0.0179         3.47        193.          0.306
+13 WHO_2021 TimeLastShotG6…       0.381         62.3         164.          0.565
+14 WHO_2019 VaccineDose5          0.120         18.5         154.          0.452
+15 WHO_2024 TimeLastShotG1…       0.0417         6.84        164.          0.297
+16 WHO_2024 TimeLastShotG3…       0.0213         3.55        166.          0.311
+17 WHO_2019 TimeLastShotG6…       0.187         27.6         147.          0.467
+18 WHO_2019 TimeLastShotG3…       0.0967        14.8         153.          0.353
+19 WHO_2019 TimeLastShotG1…       0.246         42.6         173.          0.343
+20 WHO_2021 VaccineDose5          0.0736        10.8         147.          0.440
+21 WHO_2024 TimeLastShotG6…       0.367         52.7         144.          0.508
+22 WHO_2024 VaccineDose4          0.0690         9.45        137.          0.310
+23 WHO_2021 TimeFirstShotG…       0.0971        12.3         126.          0.357
+24 WHO_2019 VaccineDose4          0.0793        10.5         133.          0.356
+25 WHO_2024 VaccineDose5          0.162         18.6         115.          0.517
+26 WHO_2024 TimeFirstShotG…       0.459         49.2         107.          0.452
+27 WHO_2019 TimeFirstShotG…       0.163         12.8          78.5         0.377
+28 WHO_2021 VaccinePregnan…       2.52         173.           68.7         0.765
+29 WHO_2019 VaccinePregnan…       2.95         171.           58.1         0.813
+30 WHO_2024 VaccinePregnan…       1.21          71.1          58.8         0.704
+# ℹ 3 more variables: base_rr_upper <dbl>, base_width_rr <dbl>,
+#   width_mult <dbl>
+
+Saved: Output/figure7_interval_width_compare.csv
+
+# B. Effective sample size after joining DTP3 (current vs HEAD)
+Counts by source-year and whether DTP3 joined:
+# A tibble: 20 × 5
+   dataset source  Year has_dtp3     n
+   <chr>   <chr>  <int> <lgl>    <int>
+ 1 CUR     GBD     2019 FALSE        5
+ 2 HEAD    GBD     2019 FALSE        5
+ 3 CUR     GBD     2019 TRUE       181
+ 4 HEAD    GBD     2019 TRUE       181
+ 5 CUR     GBD     2021 FALSE        5
+ 6 HEAD    GBD     2021 FALSE        5
+ 7 CUR     GBD     2021 TRUE       181
+ 8 HEAD    GBD     2021 TRUE       181
+ 9 CUR     WHO     2019 FALSE       13
+10 HEAD    WHO     2019 FALSE       13
+11 CUR     WHO     2019 TRUE       154
+12 HEAD    WHO     2019 TRUE       154
+13 CUR     WHO     2021 FALSE       11
+14 HEAD    WHO     2021 FALSE       11
+15 CUR     WHO     2021 TRUE       148
+16 HEAD    WHO     2021 TRUE       148
+17 CUR     WHO     2024 FALSE       17
+18 HEAD    WHO     2024 FALSE       17
+19 CUR     WHO     2024 TRUE       161
+20 HEAD    WHO     2024 TRUE       161
+
+Effective n (DTP3 available) CUR vs HEAD:
+# A tibble: 5 × 5
+  source  Year   CUR  HEAD ratio_CUR_to_HEAD
+  <chr>  <int> <int> <int>             <dbl>
+1 GBD     2019   181   181                 1
+2 GBD     2021   181   181                 1
+3 WHO     2019   154   154                 1
+4 WHO     2021   148   148                 1
+5 WHO     2024   161   161                 1
+
+Saved: Output/figure7_dtp_join_summary.csv and Output/figure7_effective_n_compare.csv
+
+# B2. Predictor level frequency changes (current vs HEAD)
+
+# B3. Numeric distribution changes (Incidence / log_rate / DTP3)
+Summary by dataset/source/year (raw):
+# A tibble: 10 × 24
+   dataset source  Year inci_n inci_min inci_p05 inci_p50 inci_p95 inci_max
+   <chr>   <chr>  <int>  <int>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl>
+ 1 CUR     GBD     2019    181   8.81     30.0   197.       648.     1047. 
+ 2 CUR     GBD     2021    181   0.0224    0.497  15.7      250.      525. 
+ 3 CUR     WHO     2019    154   0         0       0.495     20.6      63.6
+ 4 CUR     WHO     2021    148   0         0       0.0400     1.48     14.0
+ 5 CUR     WHO     2024    161   0         0       0.736     99.7     348. 
+ 6 HEAD    GBD     2019    181   8.81     30.0   197.       648.     1047. 
+ 7 HEAD    GBD     2021    181   0.0224    0.497  15.7      250.      525. 
+ 8 HEAD    WHO     2019    154   0         0       0.495     20.6      63.6
+ 9 HEAD    WHO     2021    148   0         0       0.0400     1.48     14.0
+10 HEAD    WHO     2024    161   0         0       0.736     99.7     348. 
+# ℹ 15 more variables: inci_sd <dbl>, lograte_n <int>, lograte_min <dbl>,
+#   lograte_p05 <dbl>, lograte_p50 <dbl>, lograte_p95 <dbl>, lograte_max <dbl>,
+#   lograte_sd <dbl>, dtp3_n <int>, dtp3_min <dbl>, dtp3_p05 <dbl>,
+#   dtp3_p50 <dbl>, dtp3_p95 <dbl>, dtp3_max <dbl>, dtp3_sd <dbl>
+
+Saved: Output/figure7_numeric_distributions.csv
+
+Top changes for VaccineDose:
+# A tibble: 0 × 6
+# ℹ 6 variables: source <chr>, Year <int>, level <chr>, CUR <int>, HEAD <int>,
+#   diff_CUR_minus_HEAD <int>
+
+Top changes for TimeFirstShotG:
+# A tibble: 0 × 6
+# ℹ 6 variables: source <chr>, Year <int>, level <chr>, CUR <int>, HEAD <int>,
+#   diff_CUR_minus_HEAD <int>
+
+Top changes for TimeLastShotG:
+# A tibble: 0 × 6
+# ℹ 6 variables: source <chr>, Year <int>, level <chr>, CUR <int>, HEAD <int>,
+#   diff_CUR_minus_HEAD <int>
+
+Top changes for VaccinePregnant:
+# A tibble: 0 × 6
+# ℹ 6 variables: source <chr>, Year <int>, level <chr>, CUR <int>, HEAD <int>,
+#   diff_CUR_minus_HEAD <int>
+
+Saved: Output/figure7_level_counts_compare_*.csv
+
+# C. Quick interpretation
+If wide intervals mostly affect certain factor levels (e.g., VaccineDose6 / TimeFirstShotG2.5-3.0m), and the effective n after DTP3 join dropped sharply in CUR vs HEAD, the most likely cause is a join/key change (e.g., Location_ID mismatch) or increased missingness that makes those levels sparse.
+
+Done. See Output/diagnose_figure7_wide_intervals.txt

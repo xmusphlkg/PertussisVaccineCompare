@@ -172,5 +172,6 @@ ggsave("./Output/Figure 5.png",
        width = 12,
        height = 8.5)
 
-write.xlsx(DataDTP3,
+write.xlsx(DataDTP3 |> 
+                filter(Year %in% c(2019, 2021, 2024)),
            "./Output/Figure 5.xlsx")

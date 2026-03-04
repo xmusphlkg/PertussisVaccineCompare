@@ -1,5 +1,4 @@
 
-
 #####################################
 ## @Description: Figure 4 : Global pertussis incidence vs. vaccination program
 ## @version: 1.0.0
@@ -163,15 +162,27 @@ rm(df_cases, df_population, case_to_pop_map, standardize_location, decode_html_e
 # read GBD incidence data
 df_incidence_gbd_country <- read.csv('./Data/IHME-GBD_2021_DATA-7facc03b-1.csv')
 
-df_incidence_gbd_country <- df_incidence_gbd_country|>
+df_incidence_gbd_country <- df_incidence_gbd_country |>
      # drop regional data
-     filter(!location_name %in% region_names, measure_name != "Deaths",
-            age_name == 'Age-standardized', metric_name == 'Rate',
-            year %in% c(2019, 2021, 2024)) |>
-     select(location_id, location_name, year, val)
+     filter(
+          !location_name %in% region_names,
+          measure_name != "Deaths",
+          metric_name == "Rate",
+          year %in% c(2019, 2021, 2024)
+     ) |>
+     select(location_id, location_name, year, age_name, val)
 
+# GBD age-standardized rate (ASR) - keeps existing column names for backward compatibility
 DataIncidenceGBD <- df_incidence_gbd_country |>
-     pivot_wider(names_from = year, values_from = val, names_prefix = 'GBD_Inci_')
+     filter(age_name == "Age-standardized") |>
+     select(location_id, location_name, year, val) |>
+     pivot_wider(names_from = year, values_from = val, names_prefix = "GBD_Inci_")
+
+# GBD all-age (crude) incidence rate - used for construct-alignment sensitivity analyses
+DataIncidenceGBD_AllAge <- df_incidence_gbd_country |>
+     filter(age_name == "All ages") |>
+     select(location_id, location_name, year, val) |>
+     pivot_wider(names_from = year, values_from = val, names_prefix = "GBD_AllAge_Inci_")
 
 rm(df_incidence_gbd_country)
 
@@ -180,6 +191,7 @@ rm(df_incidence_gbd_country)
 DataInciRaw <- DataIncidenceWHO |> 
      full_join(DataCountry, by = c('Location_ID' = 'ISO3')) |> 
      full_join(DataIncidenceGBD, by = 'location_id') |> 
+     full_join(DataIncidenceGBD_AllAge, by = 'location_id') |> 
      # join the raw counts/population (wide) so DataAll contains Cases_2019, Population_2019, etc.
      left_join(DataCasesPopWide, by = c('Location', 'Location_ID'))
 
