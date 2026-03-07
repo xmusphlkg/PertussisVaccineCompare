@@ -1,0 +1,81 @@
+"","ISO3","Country","MaternalPertussisRecommendation","RecommendedTimingWindow","MaternalCoverageYear","MaternalCoveragePercent","MaternalCoverageType"
+"1","AND","Andorra","Recommended","27-36w",NA,NA,NA
+"2","ARG","Argentina","Recommended","20-36w","2024",69.45,"Administrative coverage; Official coverage"
+"3","AUS","Australia","Recommended","20-32w","2023",72.9,"Article"
+"4","AUT","Austria","Recommended","27-36w",NA,NA,NA
+"5","BHS","Bahamas","Recommended","No timing specified","2024",92.34,"Administrative coverage"
+"6","BHR","Bahrain","Not recommended",NA,"2022",13.16,"Administrative coverage; Official coverage"
+"7","BEL","Belgium","Recommended","24-32w","2014-2015",64,"Article"
+"8","BMU","Bermuda","Recommended","invisible","2022",18.95,"Administrative coverage"
+"9","BRA","Brazil","Recommended","20-32w","2023",74.005,"Administrative coverage; Article"
+"10","CAN","Canada","Recommended","27-32w","2024",65,"Administrative coverage; Official coverage"
+"11","CHL","Chile","Recommended","28-36w","2024",65.49,"Administrative coverage"
+"12","COL","Colombia","Recommended","26-36w","2024",74,"Official coverage"
+"13","CRI","Costa Rica","Recommended","20-36w","2024",95.42,"Administrative coverage"
+"14","CUB","Cuba","Not recommended",NA,"2021",100,"Administrative coverage; Official coverage"
+"15","CYP","Cyprus","Recommended","27-36w",NA,NA,NA
+"16","CZE","Czechia","Not recommended",NA,"2020-2021",1.6,"Article"
+"17","DNK","Denmark","Not recommended",NA,"2024",52.03,"Administrative coverage; Official coverage"
+"18","DMA","Dominica","Not recommended",NA,"2024",48.17,"Official coverage"
+"19","DOM","Dominican Republic","Recommended","27-36w","2024",53.31,"Administrative coverage"
+"20","SLV","El Salvador","Recommended","20-36w","2024",86.48,"Administrative coverage"
+"21","FIN","Finland","Not recommended",NA,"2025",57,"Article"
+"22","FRA","France","Recommended","20-36w","2024",62.3,"Administrative coverage"
+"23","GMB","Gambia","Not recommended",NA,"2021",54.23,"Administrative coverage"
+"24","DEU","Germany","Recommended","28-36w","2024",47.9,"Administrative coverage; Official coverage"
+"25","GRC","Greece","Not recommended",NA,"2025",16.8,"Article"
+"26","GRL","Greenland","Recommended",NA,NA,NA,NA
+"27","GUM","Guam","Recommended","invisible","2024",59.6,"Official coverage"
+"28","GTM","Guatemala","Recommended","20-36w","2024",54.56,"Administrative coverage"
+"29","GNB","Guinea-Bissau","Not recommended",NA,"2023",86.92,"Administrative coverage"
+"30","HTI","Haiti","Not recommended",NA,"2024",39.07,"Official coverage"
+"31","HND","Honduras","Recommended","No timing specified","2024",79.405,"Official coverage; Administrative coverage"
+"32","HUN","Hungary","Recommended","16-32w",NA,NA,NA
+"33","ISL","Iceland","Recommended","18-36w",NA,NA,NA
+"34","IND","India","Recommended","27-36w",NA,NA,NA
+"35","IRL","Ireland","Recommended","16-36w","2018",49,"Article"
+"36","ISR","Israel","Recommended","27-36w","2021",49,"Article"
+"37","ITA","Italy","Recommended","28-36w","2023",79.52,"Article"
+"38","LVA","Latvia","Recommended","16-38w",NA,NA,NA
+"39","LTU","Lithuania","Recommended","27-36w",NA,NA,NA
+"40","LUX","Luxembourg","Recommended","13-26w",NA,NA,NA
+"41","MLI","Mali","Not recommended",NA,"2024",29.1,"Administrative coverage"
+"42","MUS","Mauritius","Recommended","No timing specified","2024",60.58,"Administrative coverage"
+"43","MEX","Mexico","Recommended","27-36w","2023",52.44,"Article"
+"44","NLD","Netherlands","Recommended","22-36w","2024",66.84,"Official coverage; Administrative coverage"
+"45","NZL","New Zealand","Recommended","16-26w","2023",61.25,"Article"
+"46","NIC","Nicaragua","Not recommended",NA,"2023",40.98,"Administrative coverage"
+"47","NIU","Niue","Recommended","invisible",NA,NA,NA
+"48","MNP","Northern Mariana Islands","Not recommended",NA,"2024",59.6,"Official coverage"
+"49","NOR","Norway","Recommended","24-36w","2024.5-2025.4",73,"Article"
+"50","OMN","Oman","Recommended",NA,"2024",92.98,"Administrative coverage; Official coverage"
+"51","PAK","Pakistan","Recommended",NA,NA,NA,NA
+"52","PAN","Panama","Recommended","27-36w","2024",74.29,"Administrative coverage; Official coverage"
+"53","PRY","Paraguay","Recommended","No timing specified","2024",62,"Official coverage"
+"54","PER","Peru","Recommended","20-36w","2024",93.21,"Administrative coverage"
+"55","PHL","Philippines","Recommended",NA,"2022",37.41,"Administrative coverage"
+"56","POL","Poland","Recommended","27-36w","2023.2-2023.4",23.4,"Article"
+"57","PRT","Portugal","Recommended","20-36w","2024",80.4,"Administrative coverage; Official coverage"
+"58","QAT","Qatar","Recommended",NA,NA,NA,NA
+"59","ROU","Romania","Recommended","No timing specified",NA,NA,NA
+"60","SAU","Saudi Arabia","Recommended","27-36w","2023.3-2023.6",3.7,"Article"
+"61","SYC","Seychelles","Not recommended",NA,"2024",0,"Official coverage"
+"62","SGP","Singapore","Recommended","27-36w","2018-2019",25.9,"Article"
+"63","SVK","Slovakia","Not recommended",NA,"2023",1.6,"Article"
+"64","SVN","Slovenia","Recommended","24-36w","2023",6.5,"Article"
+"65","ZAF","South Africa","Recommended","26-34w",NA,NA,NA
+"66","ESP","Spain","Recommended","27-36w","2024",91.83,"Administrative coverage; Official coverage"
+"67","SDN","Sudan","Not recommended",NA,"2022",44.05,"Administrative coverage; Official coverage"
+"68","SWE","Sweden","Recommended","16-36w","2024",60,"Article"
+"69","CHE","Switzerland","Recommended","13-26w","2021",85,"Article"
+"70","THA","Thailand","Recommended",NA,"2023",0,"Administrative coverage"
+"71","TGO","Togo","Not recommended",NA,"2021",71.77,"Administrative coverage; Official coverage"
+"72","TTO","Trinidad and Tobago","Not recommended",NA,"2024",17.14,"Administrative coverage"
+"73","TUR","Türkiye","Not recommended",NA,"2023.1-2023.10",11.7,"Article"
+"74","UGA","Uganda","Not recommended",NA,"2023",83,"Official coverage"
+"75","GBR","United Kingdom","Recommended","16-32w","2024",58.56,"Administrative coverage; Official coverage"
+"76","USA","United States of America","Recommended","27-36w","2023",57,"Article"
+"77","URY","Uruguay","Recommended","28-36w","2024",83.89,"Administrative coverage"
+"78","UZB","Uzbekistan","Not recommended",NA,"2023",0,"Official coverage"
+"79","VNM","Viet Nam","Not recommended",NA,"2023.2-2023.5",54.5,"Article"
+"80","ZWE","Zimbabwe","Not recommended",NA,"2023",17.15,"Administrative coverage"
