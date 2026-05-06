@@ -157,7 +157,7 @@ p2 <- ggplot(DataTime) +
           plot.title.position = 'panel',
           legend.text = element_text(margin = margin(l = 5, r = 20))) +
     labs(title = 'B',
-         x = 'Recommended time for maternal vaccination (weeks)',
+         x = 'Gestational week of vaccination',
          y = NULL)
 
 ## panel C------------------------------------
